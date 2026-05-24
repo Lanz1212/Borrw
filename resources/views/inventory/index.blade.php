@@ -26,7 +26,7 @@
     <thead><tr>
       <th>Kode</th><th>Nama Barang</th><th>Kategori</th><th>Jenis</th>
       <th style="text-align:center;">Total</th><th style="text-align:center;">Tersedia</th><th style="text-align:center;">Min</th>
-      <th>Kondisi</th>@if(auth()->user()->isAdmin())<th>Aksi</th>@endif
+      <th>Kondisi</th><th>Aksi</th>
     </tr></thead>
     <tbody id="inv-tb"><tr><td colspan="9" class="text-center py-4" style="color:var(--muted);">Memuat...</td></tr></tbody>
   </table>
@@ -140,7 +140,7 @@ async function loadInv(){
 
 function renderInvRows(items){
   const tb = document.getElementById('inv-tb');
-  const cols = IS_ADMIN_INV ? 9 : 8;
+  const cols = 9;
   if(!items.length){
     tb.innerHTML=`<tr><td colspan="${cols}"><div class="empty"><div class="ei"><i class="bi bi-box-seam"></i></div><p>Tidak ada data</p></div></td></tr>`;
     return;
@@ -156,10 +156,13 @@ function renderInvRows(items){
       <td style="text-align:center;"><strong style="color:${lo?'var(--warning)':'var(--success)'};">${i.available_qty}</strong></td>
       <td style="text-align:center;">${i.min_stock}</td>
       <td><span class="bdg b-${esc(i.condition)}">${esc(statusLabel(i.condition))}</span></td>
-      ${IS_ADMIN_INV?`<td style="white-space:nowrap;">
+      <td style="white-space:nowrap;">
+        <a href="/inventory/${i.id}/qr" class="btn btn-sm btn-outline-secondary me-1" title="Print QR"><i class="bi bi-qr-code"></i></a>
+        ${IS_ADMIN_INV?`
         <button class="btn btn-sm btn-outline-primary me-1" onclick='openInvMdl(${JSON.stringify(i)})'><i class="bi bi-pencil"></i></button>
         <button class="btn btn-sm btn-outline-danger" onclick="delInv(${i.id},'${esc(i.name)}')"><i class="bi bi-trash"></i></button>
-      </td>`:''}
+        `:''}
+      </td>
     </tr>`;
   }).join('');
 }

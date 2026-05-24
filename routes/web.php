@@ -5,6 +5,7 @@ use App\Http\Controllers\BorrowerController;
 use App\Http\Controllers\DamagedController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\InventoryController;
+use App\Http\Controllers\InventoryQrController;
 use App\Http\Controllers\ReturnController;
 use App\Http\Controllers\SettingController;
 use App\Http\Controllers\TransactionController;
@@ -32,6 +33,8 @@ Route::middleware('auth')->group(function () {
     Route::put('/inventory/{inventory}', [InventoryController::class, 'update'])->name('inventory.update');
     Route::delete('/inventory/{inventory}', [InventoryController::class, 'destroy'])->name('inventory.destroy');
     Route::post('/inventory/import', [InventoryController::class, 'import'])->name('inventory.import');
+    Route::get('/inventory/{inventory}/qr', [InventoryQrController::class, 'show'])->name('inventory.qr.show');
+    Route::get('/inventory/{inventory}/qr/print', [InventoryQrController::class, 'printView'])->name('inventory.qr.print');
 
     // Borrowers
     Route::get('/borrowers', [BorrowerController::class, 'index'])->name('borrowers.index');

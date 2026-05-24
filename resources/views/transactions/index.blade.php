@@ -40,10 +40,13 @@
 
       <div class="fgrp">
         <label class="flbl">Tambah Barang ke Keranjang</label>
-        <div class="sg-wrap sw mb-2">
-          <i class="bi bi-search"></i>
-          <input type="text" id="t-inv-txt" class="fc" placeholder="Cari kode / nama barang..." autocomplete="off" oninput="sgInvInput(this.value)" onfocus="sgInvInput(this.value)" onblur="sgInvBlur()">
-          <div id="inv-dd" class="sg-drop"></div>
+        <div class="d-flex gap-2 mb-2 align-items-start">
+          <div class="sg-wrap" style="flex:1;min-width:0;position:relative;">
+            <i class="bi bi-search" style="position:absolute;left:12px;top:50%;transform:translateY(-50%);color:var(--muted);font-size:14px;pointer-events:none;z-index:1;"></i>
+            <input type="text" id="t-inv-txt" class="fc" style="padding-left:36px;" placeholder="Cari kode / nama barang..." autocomplete="off" oninput="sgInvInput(this.value)" onfocus="sgInvInput(this.value)" onblur="sgInvBlur()">
+            <div id="inv-dd" class="sg-drop"></div>
+          </div>
+          <button type="button" onclick="openScanner()" title="Scan QR/Barcode" style="flex-shrink:0;background:linear-gradient(135deg,#1E293B,#0F172A);border:none;color:#fff;padding:10px 14px;border-radius:9px;cursor:pointer;display:flex;align-items:center;gap:6px;font-size:13px;font-weight:500;white-space:nowrap;box-shadow:0 2px 8px rgba(30,41,59,.2);transition:all .15s;" onmouseover="this.style.transform='translateY(-1px)'" onmouseout="this.style.transform=''"><i class="bi bi-qr-code-scan" style="font-size:16px;"></i><span class="d-none d-sm-inline">Scan</span></button>
         </div>
         <div id="inv-sel" class="sg-sel" style="display:none;margin-bottom:8px;">
           <i class="bi bi-box-seam-fill" style="color:var(--accent);flex-shrink:0;"></i>
@@ -99,15 +102,35 @@
     </div>
   </div>
 </div>
-<!-- Transaction Detail Modal -->
-<div class="modal fade" id="mdl-trx-detail" tabindex="-1">
-  <div class="modal-dialog modal-xl modal-dialog-scrollable modal-fullscreen-lg-down">
-    <div class="modal-content">
-      <div class="modal-header"><h5 class="modal-title"><i class="bi bi-clipboard2-data"></i> Detail Transaksi</h5><button class="btn-close" data-bs-dismiss="modal"></button></div>
-      <div class="modal-body" id="mdl-trx-body"></div>
+<!-- Scanner Modal -->
+<div class="modal fade" id="mdl-scanner" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false">
+  <div class="modal-dialog modal-dialog-centered" style="max-width:420px;">
+    <div class="modal-content" style="border-radius:16px;overflow:hidden;">
+      <div class="modal-header" style="background:linear-gradient(135deg,#1E293B,#0F172A);color:#fff;border:none;padding:14px 20px;">
+        <h5 class="modal-title" style="font-family:Poppins,sans-serif;font-weight:600;font-size:15px;display:flex;align-items:center;gap:8px;"><i class="bi bi-qr-code-scan"></i> Scan QR / Barcode</h5>
+        <button type="button" class="btn-close btn-close-white" onclick="closeScanner()"></button>
+      </div>
+      <div class="modal-body" style="padding:0;background:#000;">
+        <div style="position:relative;">
+          <div id="qr-reader" style="width:100%;"></div>
+          <div id="scan-overlay" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none;">
+            <div style="width:220px;height:220px;position:relative;">
+              <div style="position:absolute;top:0;left:0;width:24px;height:24px;border-top:3px solid var(--accent);border-left:3px solid var(--accent);border-radius:4px 0 0 0;"></div>
+              <div style="position:absolute;top:0;right:0;width:24px;height:24px;border-top:3px solid var(--accent);border-right:3px solid var(--accent);border-radius:0 4px 0 0;"></div>
+              <div style="position:absolute;bottom:0;left:0;width:24px;height:24px;border-bottom:3px solid var(--accent);border-left:3px solid var(--accent);border-radius:0 0 0 4px;"></div>
+              <div style="position:absolute;bottom:0;right:0;width:24px;height:24px;border-bottom:3px solid var(--accent);border-right:3px solid var(--accent);border-radius:0 0 4px 0;"></div>
+              <div id="scan-line" style="position:absolute;left:6px;right:6px;height:2px;background:var(--accent);box-shadow:0 0 8px var(--accent),0 0 16px rgba(249,115,22,.5);top:0;animation:scanAnim 2s ease-in-out infinite;"></div>
+            </div>
+          </div>
+        </div>
+        <div id="scanner-status" style="padding:12px 16px;text-align:center;font-size:12.5px;color:#fff;background:#1E293B;border-top:1px solid rgba(255,255,255,.1);">
+          <span id="scan-status-txt"><i class="bi bi-hourglass-split me-1"></i>Menginisialisasi kamera...</span>
+        </div>
+      </div>
     </div>
   </div>
 </div>
+
 @endsection
 
 @push('scripts')
@@ -324,5 +347,95 @@ async function submitTrx(){
 }
 
 initTrx();
+</script>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js" crossorigin="anonymous"></script>
+<style>
+@keyframes scanAnim{0%{top:6px;}50%{top:calc(100% - 8px);}100%{top:6px;}}
+#qr-reader video{width:100%!important;display:block;object-fit:cover;}
+#qr-reader{min-height:300px;background:#000;}
+#qr-reader img[alt="Info icon"]{display:none!important;}
+#qr-reader__scan_region{background:transparent!important;border:none!important;}
+#qr-reader__header_message{display:none!important;}
+#qr-reader__status_span{display:none!important;}
+#qr-reader select{display:none!important;}
+#qr-reader__camera_selection{display:none!important;}
+#qr-reader__dashboard_section_csr button{display:none!important;}
+#qr-reader__dashboard{display:none!important;}
+</style>
+<script>
+let _qrScanner = null;
+let _scannerModal = null;
+
+function openScanner(){
+  if(typeof Html5Qrcode === 'undefined'){
+    toast('Library scanner tidak tersedia. Coba refresh halaman.','danger');
+    return;
+  }
+  document.getElementById('scan-status-txt').innerHTML = '<i class="bi bi-hourglass-split me-1"></i>Menginisialisasi kamera...';
+  _scannerModal = new bootstrap.Modal(document.getElementById('mdl-scanner'));
+  _scannerModal.show();
+  document.getElementById('mdl-scanner').addEventListener('shown.bs.modal', _startScanner, {once:true});
+}
+
+function _startScanner(){
+  const config = {fps:10, qrbox:{width:230, height:230}, aspectRatio:1.0, rememberLastUsedCamera:true};
+  _qrScanner = new Html5Qrcode('qr-reader');
+  Html5Qrcode.getCameras().then(cameras => {
+    if(!cameras || !cameras.length){
+      document.getElementById('scan-status-txt').innerHTML = '<i class="bi bi-exclamation-triangle text-warning me-1"></i>Tidak ada kamera ditemukan';
+      return;
+    }
+    const virtualRe = /obs|virtual|screen|capture|dshow|snap|zoom|teams|skype|manycam|wirecast|xsplit/i;
+    const physical = cameras.filter(c => !virtualRe.test(c.label));
+    const pool = physical.length ? physical : cameras;
+    const selected = pool.find(c => /back|rear|environment/i.test(c.label))
+                  || pool.find(c => /integrated|built.?in|facetime|webcam|hd cam|usb cam|laptop/i.test(c.label))
+                  || pool[0];
+    _qrScanner.start(selected.id, config, _onScanSuccess, ()=>{}).then(()=>{
+      document.getElementById('scan-status-txt').innerHTML = '<i class="bi bi-camera-fill text-success me-1"></i>Arahkan kamera ke QR / barcode barang...';
+    }).catch(()=>{
+      document.getElementById('scan-status-txt').innerHTML = '<i class="bi bi-exclamation-circle text-danger me-1"></i>Izin kamera diperlukan. Izinkan akses kamera di browser.';
+    });
+  }).catch(()=>{
+    document.getElementById('scan-status-txt').innerHTML = '<i class="bi bi-exclamation-circle text-danger me-1"></i>Izin kamera ditolak. Periksa pengaturan browser.';
+  });
+}
+
+function _onScanSuccess(decodedText){
+  const code = decodedText.trim();
+  closeScanner();
+  const exact = _invT.find(i => i.code === code);
+  if(exact){
+    if(exact.available_qty > 0){
+      sgInvSelect(exact.id, exact.name, exact.code, exact.type, exact.available_qty);
+      toast('Barang berhasil dipindai: '+exact.code+' — '+exact.name, 'success');
+    } else {
+      toast('Barang "'+exact.code+'" ditemukan tapi stok habis!','warning');
+      document.getElementById('t-inv-txt').value = code;
+      sgInvInput(code);
+    }
+  } else {
+    document.getElementById('t-inv-txt').value = code;
+    sgInvInput(code);
+    const partial = _invT.filter(i => (i.code||'').toLowerCase().includes(code.toLowerCase()) || (i.name||'').toLowerCase().includes(code.toLowerCase()));
+    if(!partial.length){
+      toast('Barang dengan kode "'+code+'" tidak ditemukan','warning');
+    } else {
+      toast('Kode dipindai: '+code+' — Pilih dari daftar','info');
+    }
+  }
+}
+
+function closeScanner(){
+  if(_qrScanner){
+    _qrScanner.isScanning ? _qrScanner.stop().then(()=>{_qrScanner.clear();_qrScanner=null;}).catch(()=>{_qrScanner=null;}) : (_qrScanner.clear(), _qrScanner=null);
+  }
+  if(_scannerModal){_scannerModal.hide();_scannerModal=null;}
+}
+
+document.getElementById('mdl-scanner').addEventListener('hide.bs.modal',()=>{
+  if(_qrScanner && _qrScanner.isScanning){_qrScanner.stop().catch(()=>{});_qrScanner=null;}
+});
 </script>
 @endpush
