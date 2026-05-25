@@ -92,7 +92,7 @@ class ReturnController extends Controller
 
             $this->updateTransactionStatus($transaction);
 
-            $transaction->update(['return_date' => now()]);
+            DB::table('transactions')->where('id', $transaction->id)->update(['return_date' => now(), 'updated_at' => now()]);
 
             return response()->json(['success' => true, 'message' => 'Pengembalian berhasil dicatat.']);
         });
@@ -110,6 +110,6 @@ class ReturnController extends Controller
         $anyReturned = $pinjamDetails->some(fn($d) => $d->status === 'kembali');
 
         $status = $allReturned ? 'selesai' : ($anyReturned ? 'partial' : 'aktif');
-        $transaction->update(['status' => $status]);
+        DB::table('transactions')->where('id', $transaction->id)->update(['status' => $status, 'updated_at' => now()]);
     }
 }

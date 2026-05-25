@@ -17,51 +17,63 @@ Route::get('/login', [AuthController::class, 'showLogin'])->name('login');
 Route::post('/login', [AuthController::class, 'login'])->name('login.post');
 Route::post('/logout', [AuthController::class, 'logout'])->name('logout')->middleware('auth');
 
-Route::get('/', fn() => redirect()->route('dashboard'));
+Route::get('/', function () {
+    if (!auth()->check()) return redirect()->route('login');
+    return redirect()->route(auth()->user()->isAdmin() ? 'dashboard' : 'transactions.index');
+});
 
 // Protected
 Route::middleware('auth')->group(function () {
 
-    // Dashboard
-    Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
-    Route::get('/dashboard/stats', [DashboardController::class, 'stats'])->name('dashboard.stats');
-
-    // Inventory
-    Route::get('/inventory', [InventoryController::class, 'index'])->name('inventory.index');
+    // Data APIs needed by the transactions page autocomplete (both roles)
     Route::get('/inventory/data', [InventoryController::class, 'data'])->name('inventory.data');
-    Route::post('/inventory', [InventoryController::class, 'store'])->name('inventory.store');
-    Route::put('/inventory/{inventory}', [InventoryController::class, 'update'])->name('inventory.update');
-    Route::delete('/inventory/{inventory}', [InventoryController::class, 'destroy'])->name('inventory.destroy');
-    Route::post('/inventory/import', [InventoryController::class, 'import'])->name('inventory.import');
-    Route::get('/inventory/{inventory}/qr', [InventoryQrController::class, 'show'])->name('inventory.qr.show');
-    Route::get('/inventory/{inventory}/qr/print', [InventoryQrController::class, 'printView'])->name('inventory.qr.print');
-
-    // Borrowers
-    Route::get('/borrowers', [BorrowerController::class, 'index'])->name('borrowers.index');
     Route::get('/borrowers/data', [BorrowerController::class, 'data'])->name('borrowers.data');
-    Route::post('/borrowers', [BorrowerController::class, 'store'])->name('borrowers.store');
-    Route::put('/borrowers/{borrower}', [BorrowerController::class, 'update'])->name('borrowers.update');
-    Route::delete('/borrowers/{borrower}', [BorrowerController::class, 'destroy'])->name('borrowers.destroy');
 
-    // Transactions
+    // Transactions — both roles
     Route::get('/transactions', [TransactionController::class, 'index'])->name('transactions.index');
     Route::get('/transactions/history', [TransactionController::class, 'history'])->name('transactions.history');
     Route::get('/transactions/data', [TransactionController::class, 'data'])->name('transactions.data');
     Route::post('/transactions', [TransactionController::class, 'store'])->name('transactions.store');
     Route::get('/transactions/active', [TransactionController::class, 'active'])->name('transactions.active');
 
-    // Returns
+    // Returns — both roles
     Route::get('/returns', [ReturnController::class, 'index'])->name('returns.index');
     Route::post('/returns', [ReturnController::class, 'store'])->name('returns.store');
 
-    // Damaged
-    Route::get('/damaged', [DamagedController::class, 'index'])->name('damaged.index');
-    Route::get('/damaged/history', [DamagedController::class, 'history'])->name('damaged.history');
-    Route::get('/damaged/data', [DamagedController::class, 'data'])->name('damaged.data');
-    Route::post('/damaged', [DamagedController::class, 'store'])->name('damaged.store');
-
-    // Users - admin only
+    // Admin-only routes
     Route::middleware('role:admin')->group(function () {
+
+        // Dashboard
+        Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
+        Route::get('/dashboard/stats', [DashboardController::class, 'stats'])->name('dashboard.stats');
+
+        // Inventory management
+        Route::get('/inventory', [InventoryController::class, 'index'])->name('inventory.index');
+        Route::post('/inventory', [InventoryController::class, 'store'])->name('inventory.store');
+        Route::put('/inventory/{inventory}', [InventoryController::class, 'update'])->name('inventory.update');
+        Route::delete('/inventory/{inventory}', [InventoryController::class, 'destroy'])->name('inventory.destroy');
+        Route::post('/inventory/import', [InventoryController::class, 'import'])->name('inventory.import');
+        Route::get('/inventory/{inventory}/qr', [InventoryQrController::class, 'show'])->name('inventory.qr.show');
+        Route::get('/inventory/{inventory}/qr/print', [InventoryQrController::class, 'printView'])->name('inventory.qr.print');
+
+        // Borrowers management
+        Route::get('/borrowers', [BorrowerController::class, 'index'])->name('borrowers.index');
+        Route::post('/borrowers', [BorrowerController::class, 'store'])->name('borrowers.store');
+        Route::put('/borrowers/{borrower}', [BorrowerController::class, 'update'])->name('borrowers.update');
+        Route::delete('/borrowers/{borrower}', [BorrowerController::class, 'destroy'])->name('borrowers.destroy');
+
+        // Damaged
+        Route::get('/damaged', [DamagedController::class, 'index'])->name('damaged.index');
+        Route::get('/damaged/history', [DamagedController::class, 'history'])->name('damaged.history');
+        Route::get('/damaged/data', [DamagedController::class, 'data'])->name('damaged.data');
+        Route::post('/damaged', [DamagedController::class, 'store'])->name('damaged.store');
+
+        // Transaction approval
+        Route::get('/transactions/pending', [TransactionController::class, 'pending'])->name('transactions.pending');
+        Route::post('/transactions/{transaction}/approve', [TransactionController::class, 'approve'])->name('transactions.approve');
+        Route::post('/transactions/{transaction}/reject', [TransactionController::class, 'reject'])->name('transactions.reject');
+
+        // Users
         Route::get('/users', [UserController::class, 'index'])->name('users.index');
         Route::get('/users/data', [UserController::class, 'data'])->name('users.data');
         Route::post('/users', [UserController::class, 'store'])->name('users.store');

@@ -84,10 +84,21 @@
   <!-- Right: Quick Info -->
   <div class="col-12 col-xl-7">
     <div class="row g-3">
-      <div class="col-12 col-sm-4"><div class="stat-card sc-blue"><div class="stat-ico si-blue"><i class="bi bi-arrow-left-right"></i></div><div class="stat-val" id="qs-total">—</div><div class="stat-lbl">Total Transaksi</div></div></div>
-      <div class="col-12 col-sm-4"><div class="stat-card sc-orange"><div class="stat-ico si-orange"><i class="bi bi-clock-fill"></i></div><div class="stat-val" id="qs-aktif">—</div><div class="stat-lbl">Sedang Aktif</div></div></div>
-      <div class="col-12 col-sm-4"><div class="stat-card sc-green"><div class="stat-ico si-green"><i class="bi bi-check-circle-fill"></i></div><div class="stat-val" id="qs-done">—</div><div class="stat-lbl">Selesai</div></div></div>
+      <div class="col-6 col-lg-3"><div class="stat-card sc-blue"><div class="stat-ico si-blue"><i class="bi bi-arrow-left-right"></i></div><div class="stat-val" id="qs-total">—</div><div class="stat-lbl">Total Transaksi</div></div></div>
+      <div class="col-6 col-lg-3"><div class="stat-card sc-orange"><div class="stat-ico si-orange"><i class="bi bi-clock-fill"></i></div><div class="stat-val" id="qs-aktif">—</div><div class="stat-lbl">Aktif</div></div></div>
+      <div class="col-6 col-lg-3"><div class="stat-card sc-green"><div class="stat-ico si-green"><i class="bi bi-check-circle-fill"></i></div><div class="stat-val" id="qs-done">—</div><div class="stat-lbl">Selesai</div></div></div>
+      <div class="col-6 col-lg-3"><div class="stat-card sc-red"><div class="stat-ico si-red"><i class="bi bi-arrow-return-right"></i></div><div class="stat-val" id="qs-partial">—</div><div class="stat-lbl">Sebagian Kembali</div></div></div>
     </div>
+    @if(auth()->user()->isAdmin())
+    <!-- Pending approval section (admin only) -->
+    <div id="pending-section" class="card p20 mt-3" style="display:none;border-left:3px solid var(--warning);">
+      <div class="d-flex align-items-center justify-content-between mb-3 flex-wrap gap-2">
+        <div class="st"><i class="bi bi-hourglass-split" style="color:var(--warning);"></i> Menunggu Persetujuan <span id="pending-cnt" class="badge ms-1" style="background:var(--warning);color:#1E293B;font-size:11px;"></span></div>
+      </div>
+      <div id="pending-list"></div>
+    </div>
+    @endif
+
     <div class="card p20 mt-3">
       <div class="d-flex align-items-center justify-content-between mb-3">
         <div class="st"><i class="bi bi-clock-history text-primary"></i> Transaksi Terbaru</div>
@@ -140,27 +151,73 @@ let _cart = [], _invT = [], _brwT = [], _selInv = null, _trxStore = [];
 async function initTrx(){
   ld(true);
   try{
-    const [invR, brwR, trxR] = await Promise.all([
+    const requests = [
       api('{{ route("inventory.data") }}'),
       api('{{ route("borrowers.data") }}'),
       api('{{ route("transactions.data") }}'),
-    ]);
+    ];
+    @if(auth()->user()->isAdmin())
+    requests.push(api('{{ route("transactions.pending") }}'));
+    @endif
+    const results = await Promise.all(requests);
     ld(false);
-    _invT = invR.data || [];
-    _brwT = brwR.data || [];
-    _trxStore = trxR.data || [];
-    const total = _trxStore.length;
-    const aktif = _trxStore.filter(t=>t.status==='aktif'||t.status==='partial').length;
-    const done  = _trxStore.filter(t=>t.status==='selesai').length;
-    document.getElementById('qs-total').textContent = total;
-    document.getElementById('qs-aktif').textContent = aktif;
-    document.getElementById('qs-done').textContent = done;
-    renderTrxRows(_trxStore.slice(0,8));
+    _invT = results[0].data || [];
+    _brwT = results[1].data || [];
+    _trxStore = results[2].data || [];
+    const nonPending = _trxStore.filter(t=>t.status!=='menunggu_persetujuan'&&t.status!=='ditolak');
+    const total   = nonPending.length;
+    const aktif   = nonPending.filter(t=>t.status==='aktif').length;
+    const done    = nonPending.filter(t=>t.status==='selesai').length;
+    const partial = nonPending.filter(t=>t.status==='partial').length;
+    document.getElementById('qs-total').textContent   = total;
+    document.getElementById('qs-aktif').textContent   = aktif;
+    document.getElementById('qs-done').textContent    = done;
+    document.getElementById('qs-partial').textContent = partial;
+    renderTrxRows(_trxStore.filter(t=>t.status!=='menunggu_persetujuan'&&t.status!=='ditolak').slice(0,8));
+    @if(auth()->user()->isAdmin())
+    renderPending(results[3]?.data || []);
+    @endif
     renderCart();
   }catch(e){ld(false);toast(e.message,'danger');}
   document.getElementById('t-ld').value = nowLocal();
   setTimeout(initSig, 100);
 }
+
+@if(auth()->user()->isAdmin())
+function renderPending(list){
+  const sec = document.getElementById('pending-section');
+  const box = document.getElementById('pending-list');
+  if(!list.length){sec.style.display='none';return;}
+  sec.style.display='block';
+  document.getElementById('pending-cnt').textContent = list.length;
+  box.innerHTML = list.map(t=>{
+    const items=(t.details||[]).map(d=>`<span class="bdg" style="background:rgba(100,116,139,.1);color:var(--muted);font-size:10px;">${esc(d.item_name)} ×${d.qty}</span>`).join(' ');
+    return `<div style="border:1px solid var(--border);border-radius:10px;padding:13px;margin-bottom:10px;background:#fff;">
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-bottom:8px;flex-wrap:wrap;">
+        <div>
+          <code style="font-size:11px;color:var(--muted);">${esc(t.transaction_code)}</code>
+          <div style="font-weight:700;font-size:14px;margin:2px 0;">${esc(t.borrower_name)}</div>
+          <div style="font-size:11px;color:var(--muted);">${fdt(t.loan_date)} &bull; ${esc(t.created_by_name||'User')}</div>
+        </div>
+        <span class="bdg b-menunggu_persetujuan">Menunggu Konfirmasi</span>
+      </div>
+      <div style="margin-bottom:10px;display:flex;flex-wrap:wrap;gap:4px;">${items}</div>
+      <div style="display:flex;gap:8px;">
+        <button class="btn btn-sm btn-success" style="flex:1;font-weight:600;" onclick="approveTrx(${t.id})"><i class="bi bi-check-lg me-1"></i>Setujui</button>
+        <button class="btn btn-sm btn-outline-danger" style="flex:1;font-weight:600;" onclick="rejectTrx(${t.id})"><i class="bi bi-x-lg me-1"></i>Tolak</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+async function approveTrx(id){
+  if(!confirm('Setujui peminjaman ini? Stok barang akan dikurangi.'))return;
+  try{const r=await api('/transactions/'+id+'/approve','POST');toast(r.message,'success');initTrx();}catch(e){toast(e.message,'danger');}
+}
+async function rejectTrx(id){
+  if(!confirm('Tolak peminjaman ini?'))return;
+  try{const r=await api('/transactions/'+id+'/reject','POST');toast(r.message,'success');initTrx();}catch(e){toast(e.message,'danger');}
+}
+@endif
 
 function renderTrxRows(list){
   const tb = document.getElementById('trx-tb');
@@ -297,15 +354,23 @@ function rmCart(i){_cart.splice(i,1);renderCart();}
 // Signature
 function initSig(){
   const cv=document.getElementById('sig-cv');if(!cv)return;
-  const rect=cv.parentElement.getBoundingClientRect();cv.width=rect.width;
+  const r0=cv.getBoundingClientRect();
+  cv.width=Math.round(r0.width)||320;
   const ctx=cv.getContext('2d');let drw=false,lx=0,ly=0;
-  function pos(e){const r=cv.getBoundingClientRect(),s=e.touches?e.touches[0]:e;return{x:s.clientX-r.left,y:s.clientY-r.top};}
+  function pos(e){
+    const r=cv.getBoundingClientRect();
+    const s=e.touches?e.touches[0]:e;
+    const scaleX=cv.width/r.width;
+    const scaleY=cv.height/r.height;
+    return{x:(s.clientX-r.left)*scaleX,y:(s.clientY-r.top)*scaleY};
+  }
   function start(e){e.preventDefault();drw=true;const p=pos(e);lx=p.x;ly=p.y;}
   function move(e){if(!drw)return;e.preventDefault();const p=pos(e);ctx.beginPath();ctx.moveTo(lx,ly);ctx.lineTo(p.x,p.y);ctx.strokeStyle='#000000';ctx.lineWidth=2;ctx.lineCap='round';ctx.stroke();lx=p.x;ly=p.y;}
   function stop(){drw=false;}
   cv.addEventListener('mousedown',start);cv.addEventListener('touchstart',start,{passive:false});
   cv.addEventListener('mousemove',move);cv.addEventListener('touchmove',move,{passive:false});
   cv.addEventListener('mouseup',stop);cv.addEventListener('touchend',stop);
+  window.addEventListener('resize',()=>{const rn=cv.getBoundingClientRect();if(rn.width>0){cv.width=Math.round(rn.width);}});
 }
 function clrSig(){const c=document.getElementById('sig-cv');if(c)c.getContext('2d').clearRect(0,0,c.width,c.height);}
 
@@ -322,7 +387,7 @@ async function submitTrx(){
   if(cv){try{const tmp=document.createElement('canvas');tmp.width=180;tmp.height=50;const tc=tmp.getContext('2d');tc.fillStyle='#ffffff';tc.fillRect(0,0,180,50);tc.drawImage(cv,0,0,180,50);sig=tmp.toDataURL('image/jpeg',0.7);}catch(e){sig='';}}
   const txData={
     borrower_id:parseInt(brwId),borrower_name:brwNm,
-    loan_date:new Date(loanDt).toISOString(),
+    loan_date:loanDt,
     notes,signature:sig,
     cart:_cart.map(c=>({inventory_id:c.id,qty:c.qty}))
   };
@@ -330,7 +395,8 @@ async function submitTrx(){
   try{
     const res=await api('{{ route("transactions.store") }}','POST',txData);
     ld(false);
-    toast(`Transaksi ${res.transaction_code} berhasil!`,'success');
+    const toastType = res.pending ? 'warning' : 'success';
+    toast(res.pending ? `${res.transaction_code} — Menunggu persetujuan admin.` : `Transaksi ${res.transaction_code} berhasil!`, toastType);
     _cart=[];_selInv=null;
     document.getElementById('t-brw').value='';
     document.getElementById('t-brw-txt').value='';
@@ -340,9 +406,16 @@ async function submitTrx(){
     clrSig();renderCart();
     const trxR=await api('{{ route("transactions.data") }}');
     _trxStore=trxR.data||[];
-    const total=_trxStore.length, aktif=_trxStore.filter(t=>t.status==='aktif'||t.status==='partial').length, done=_trxStore.filter(t=>t.status==='selesai').length;
-    document.getElementById('qs-total').textContent=total;document.getElementById('qs-aktif').textContent=aktif;document.getElementById('qs-done').textContent=done;
-    renderTrxRows(_trxStore.slice(0,8));
+    const nonP=_trxStore.filter(t=>t.status!=='menunggu_persetujuan'&&t.status!=='ditolak');
+    document.getElementById('qs-total').textContent  =nonP.length;
+    document.getElementById('qs-aktif').textContent  =nonP.filter(t=>t.status==='aktif').length;
+    document.getElementById('qs-done').textContent   =nonP.filter(t=>t.status==='selesai').length;
+    document.getElementById('qs-partial').textContent=nonP.filter(t=>t.status==='partial').length;
+    renderTrxRows(nonP.slice(0,8));
+    @if(auth()->user()->isAdmin())
+    const pendR=await api('{{ route("transactions.pending") }}');
+    renderPending(pendR.data||[]);
+    @endif
   }catch(e){ld(false);toast(e.message,'danger');}
 }
 

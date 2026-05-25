@@ -20,7 +20,7 @@ class CheckRole
             if ($request->expectsJson()) {
                 return response()->json(['success' => false, 'message' => 'Akses ditolak.'], 403);
             }
-            abort(403, 'Akses ditolak.');
+            return redirect()->route('transactions.index')->with('error', 'Akses ditolak. Fitur ini hanya untuk administrator.');
         }
 
         return $next($request);

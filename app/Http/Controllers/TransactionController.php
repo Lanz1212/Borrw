@@ -78,7 +78,9 @@ class TransactionController extends Controller
             'signature'     => 'nullable|string',
         ]);
 
-        return DB::transaction(function () use ($request) {
+        $isAdmin = auth()->user()->isAdmin();
+
+        return DB::transaction(function () use ($request, $isAdmin) {
             $cart = $request->cart;
 
             $allConsumable = true;
@@ -100,7 +102,11 @@ class TransactionController extends Controller
 
             $user   = auth()->user();
             $code   = 'TRX-' . now()->format('Ymd') . '-' . str_pad(rand(1000, 9999), 4, '0', STR_PAD_LEFT);
-            $status = $allConsumable ? 'selesai' : 'aktif';
+
+            // Admin: langsung aktif/selesai. User: menunggu persetujuan admin.
+            $status = $isAdmin
+                ? ($allConsumable ? 'selesai' : 'aktif')
+                : 'menunggu_persetujuan';
 
             $transaction = Transaction::create([
                 'transaction_code' => $code,
@@ -115,7 +121,7 @@ class TransactionController extends Controller
             ]);
 
             foreach ($cart as $cartItem) {
-                $inv        = $inventoryMap[$cartItem['inventory_id']];
+                $inv          = $inventoryMap[$cartItem['inventory_id']];
                 $detailStatus = $inv->type === 'pinjam' ? 'dipinjam' : 'dipakai';
 
                 TransactionDetail::create([
@@ -129,15 +135,98 @@ class TransactionController extends Controller
                     'qty_returned'   => 0,
                 ]);
 
-                $inv->decrement('available_qty', $cartItem['qty']);
+                // Stok hanya dikurangi jika admin yang membuat (langsung aktif)
+                if ($isAdmin) {
+                    $inv->decrement('available_qty', $cartItem['qty']);
+                }
             }
 
+            $message = $isAdmin
+                ? 'Transaksi berhasil dibuat.'
+                : 'Transaksi diajukan dan menunggu persetujuan admin.';
+
             return response()->json([
-                'success'         => true,
-                'message'         => 'Transaksi berhasil dibuat.',
+                'success'          => true,
+                'message'          => $message,
                 'transaction_code' => $code,
+                'pending'          => !$isAdmin,
             ]);
         });
+    }
+
+    public function pending(): JsonResponse
+    {
+        $transactions = Transaction::with('details')
+            ->where('status', 'menunggu_persetujuan')
+            ->orderByDesc('created_at')
+            ->get()
+            ->map(fn($t) => [
+                'id'               => $t->id,
+                'transaction_code' => $t->transaction_code,
+                'borrower_name'    => $t->borrower_name,
+                'loan_date'        => $t->loan_date?->toISOString(),
+                'notes'            => $t->notes,
+                'created_by_name'  => $t->created_by_name,
+                'details'          => $t->details->map(fn($d) => [
+                    'item_name' => $d->item_name,
+                    'item_code' => $d->item_code,
+                    'item_type' => $d->item_type,
+                    'qty'       => $d->qty,
+                ]),
+            ]);
+
+        return response()->json(['success' => true, 'data' => $transactions]);
+    }
+
+    public function approve(Transaction $transaction): JsonResponse
+    {
+        if ($transaction->status !== 'menunggu_persetujuan') {
+            return response()->json(['success' => false, 'message' => 'Transaksi bukan dalam status menunggu persetujuan.'], 422);
+        }
+
+        return DB::transaction(function () use ($transaction) {
+            $allConsumable = true;
+
+            foreach ($transaction->details as $detail) {
+                $inv = Inventory::lockForUpdate()->find($detail->inventory_id);
+                if (!$inv) {
+                    return response()->json(['success' => false,
+                        'message' => "Barang \"{$detail->item_name}\" tidak ditemukan di inventori."], 422);
+                }
+                if ($inv->available_qty < $detail->qty) {
+                    return response()->json(['success' => false,
+                        'message' => "Stok \"{$inv->name}\" tidak mencukupi. Tersedia: {$inv->available_qty}"], 422);
+                }
+                if ($inv->type === 'pinjam') {
+                    $allConsumable = false;
+                }
+            }
+
+            foreach ($transaction->details as $detail) {
+                $inv = Inventory::find($detail->inventory_id);
+                if ($inv) {
+                    $inv->decrement('available_qty', $detail->qty);
+                }
+            }
+
+            $transaction->update([
+                'status'          => $allConsumable ? 'selesai' : 'aktif',
+                'created_by_name' => $transaction->created_by_name . ' (disetujui)',
+            ]);
+
+            return response()->json(['success' => true, 'message' => 'Transaksi disetujui dan stok telah dikurangi.']);
+        });
+    }
+
+    public function reject(Transaction $transaction): JsonResponse
+    {
+        if ($transaction->status !== 'menunggu_persetujuan') {
+            return response()->json(['success' => false, 'message' => 'Transaksi bukan dalam status menunggu persetujuan.'], 422);
+        }
+
+        $transaction->update(['status' => 'ditolak']);
+
+        return response()->json(['success' => true, 'message' => 'Transaksi ditolak.']);
     }
 
     public function active(): JsonResponse
@@ -145,6 +234,7 @@ class TransactionController extends Controller
         $transactions = Transaction::with(['details' => function ($q) {
             $q->where('item_type', 'pinjam')->where('status', 'dipinjam');
         }])
+        ->whereIn('status', ['aktif', 'partial'])
         ->whereHas('details', function ($q) {
             $q->where('item_type', 'pinjam')->where('status', 'dipinjam');
         })

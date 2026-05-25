@@ -11,7 +11,7 @@ class AuthController extends Controller
     public function showLogin()
     {
         if (Auth::check()) {
-            return redirect()->route('dashboard');
+            return redirect()->route(Auth::user()->isAdmin() ? 'dashboard' : 'transactions.index');
         }
         $appName = Setting::get('app_name', 'Sparepart MS');
         return view('auth.login', compact('appName'));
@@ -39,7 +39,8 @@ class AuthController extends Controller
         }
 
         $request->session()->regenerate();
-        return redirect()->intended(route('dashboard'));
+        $home = auth()->user()->isAdmin() ? route('dashboard') : route('transactions.index');
+        return redirect()->intended($home);
     }
 
     public function logout(Request $request)

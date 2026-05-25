@@ -56,10 +56,10 @@
         ]
       },
       options:{responsive:true,maintainAspectRatio:false,
-        plugins:{legend:{position:'bottom',labels:{font:{family:'Poppins',size:12},usePointStyle:true,pointStyleWidth:8,padding:16}}},
+        plugins:{legend:{position:'bottom',labels:{font:{family:'Inter',size:12},usePointStyle:false,boxWidth:10,boxHeight:10,padding:20}}},
         scales:{
-          y:{beginAtZero:true,ticks:{stepSize:1,font:{family:'Poppins',size:11}},grid:{color:'rgba(0,0,0,.04)'}},
-          x:{ticks:{font:{family:'Poppins',size:10},maxRotation:45,autoSkip:true,maxTicksLimit:10},grid:{display:false}}
+          y:{beginAtZero:true,ticks:{stepSize:1,font:{family:'Inter',size:11}},grid:{color:'rgba(0,0,0,.04)'}},
+          x:{ticks:{font:{family:'Inter',size:10},maxRotation:45,autoSkip:true,maxTicksLimit:10},grid:{display:false}}
         }
       }
     });

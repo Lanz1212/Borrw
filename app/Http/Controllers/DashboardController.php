@@ -21,8 +21,11 @@ class DashboardController extends Controller
 
         $totalItems    = $inventory->count();
         $availableItems = $inventory->sum('available_qty');
-        $borrowedItems  = $inventory->where('type', 'pinjam')
-            ->sum(fn($i) => max(0, $i->total_qty - $i->available_qty));
+        $borrowedItems  = (int) TransactionDetail::whereHas('transaction', function ($q) {
+                $q->whereIn('status', ['aktif', 'partial']);
+            })
+            ->where('item_type', 'pinjam')
+            ->sum(\DB::raw('qty - COALESCE(qty_returned, 0)'));
         $lowStock = $inventory->filter(fn($i) => $i->min_stock > 0 && $i->available_qty <= $i->min_stock)
             ->map(fn($i) => ['name' => $i->name, 'available' => $i->available_qty, 'minStock' => $i->min_stock])
             ->values();
@@ -42,7 +45,7 @@ class DashboardController extends Controller
 
         $details = TransactionDetail::with('transaction')
             ->whereHas('transaction', function ($q) {
-                $q->where('loan_date', '>=', now()->subDays(29)->startOfDay());
+                $q->where('loan_date', '>=', now()->subDays(30)->startOfDay());
             })
             ->get();
 
