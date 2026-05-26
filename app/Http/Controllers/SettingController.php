@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Setting;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class SettingController extends Controller
 {
@@ -22,17 +23,145 @@ class SettingController extends Controller
     public function update(Request $request): JsonResponse
     {
         $request->validate([
-            'app_name'     => 'nullable|string|max:100',
-            'company_name' => 'nullable|string|max:100',
-            'categories'   => 'nullable|string',
+            'app_name'        => 'nullable|string|max:100',
+            'categories'      => 'nullable|string',
+            'session_timeout' => 'nullable|integer|min:1|max:1440',
+            'multi_login'     => 'nullable|in:0,1',
+            'theme'           => 'nullable|in:orange,blue,green,dark',
+            'dark_mode'       => 'nullable|in:0,1',
         ]);
 
-        foreach (['app_name', 'company_name', 'categories'] as $key) {
+        $keys = ['app_name', 'categories', 'session_timeout', 'multi_login', 'theme', 'dark_mode'];
+        foreach ($keys as $key) {
             if ($request->has($key)) {
-                Setting::set($key, $request->input($key));
+                Setting::set($key, (string) $request->input($key, ''));
             }
         }
 
         return response()->json(['success' => true, 'message' => 'Pengaturan berhasil disimpan.']);
+    }
+
+    public function backup(): \Illuminate\Http\Response
+    {
+        $dbName   = config('database.connections.mysql.database');
+        $fileName = 'backup_' . $dbName . '_' . now()->format('Ymd_His') . '.sql';
+        $sql      = $this->generateSqlDump();
+
+        return response($sql, 200, [
+            'Content-Type'        => 'application/octet-stream',
+            'Content-Disposition' => 'attachment; filename="' . $fileName . '"',
+            'Content-Length'      => mb_strlen($sql, '8bit'),
+            'Cache-Control'       => 'no-cache, no-store, must-revalidate',
+            'Pragma'              => 'no-cache',
+        ]);
+    }
+
+    private function generateSqlDump(): string
+    {
+        $out    = [];
+        $dbName = config('database.connections.mysql.database');
+
+        $out[] = '-- Borrw Database Backup';
+        $out[] = '-- Generated   : ' . now()->toDateTimeString();
+        $out[] = '-- Database    : ' . $dbName;
+        $out[] = '';
+        $out[] = 'SET SQL_MODE = "NO_AUTO_VALUE_ON_ZERO";';
+        $out[] = 'SET AUTOCOMMIT = 0;';
+        $out[] = 'START TRANSACTION;';
+        $out[] = 'SET time_zone = "+00:00";';
+        $out[] = 'SET FOREIGN_KEY_CHECKS = 0;';
+        $out[] = '';
+
+        $tableKey = 'Tables_in_' . $dbName;
+        $tables   = DB::select('SHOW TABLES');
+
+        foreach ($tables as $tableRow) {
+            $arr   = (array) $tableRow;
+            $table = $arr[$tableKey] ?? array_values($arr)[0];
+
+            $createResult = DB::select("SHOW CREATE TABLE `{$table}`");
+            $createSql    = $createResult[0]->{'Create Table'};
+
+            $out[] = '-- --------------------------------------------------------';
+            $out[] = "-- Table: `{$table}`";
+            $out[] = '-- --------------------------------------------------------';
+            $out[] = '';
+            $out[] = "DROP TABLE IF EXISTS `{$table}`;";
+            $out[] = $createSql . ';';
+            $out[] = '';
+
+            $rows = DB::table($table)->get();
+            if ($rows->isEmpty()) continue;
+
+            $firstRow = (array) $rows->first();
+            $cols     = '`' . implode('`, `', array_keys($firstRow)) . '`';
+            $out[]    = "-- Data for `{$table}`";
+
+            foreach ($rows->chunk(500) as $chunk) {
+                $valLines = $chunk->map(function ($row) {
+                    $escaped = array_map(function ($v) {
+                        if ($v === null) return 'NULL';
+                        if (is_int($v) || is_float($v)) return $v;
+                        return "'" . str_replace(
+                            ['\\', "'", "\n", "\r", "\x1a"],
+                            ['\\\\', "\\'", '\\n', '\\r', '\\Z'],
+                            (string) $v
+                        ) . "'";
+                    }, (array) $row);
+                    return '  (' . implode(', ', $escaped) . ')';
+                })->implode(",\n");
+
+                $out[] = "INSERT INTO `{$table}` ({$cols}) VALUES";
+                $out[] = $valLines . ';';
+                $out[] = '';
+            }
+        }
+
+        $out[] = 'SET FOREIGN_KEY_CHECKS = 1;';
+        $out[] = 'COMMIT;';
+        $out[] = '';
+        $out[] = '-- End of backup';
+
+        return implode("\n", $out);
+    }
+
+    public function restore(Request $request): JsonResponse
+    {
+        $request->validate(['sql_file' => 'required|file|max:102400']);
+
+        $file = $request->file('sql_file');
+        $ext  = strtolower($file->getClientOriginalExtension());
+
+        if (! in_array($ext, ['sql', 'txt'])) {
+            return response()->json(['success' => false, 'message' => 'File harus berekstensi .sql'], 422);
+        }
+
+        $sql = file_get_contents($file->getRealPath());
+        if (empty(trim($sql))) {
+            return response()->json(['success' => false, 'message' => 'File SQL kosong.'], 422);
+        }
+
+        try {
+            DB::statement('SET FOREIGN_KEY_CHECKS = 0');
+
+            $statements = array_filter(
+                array_map('trim', preg_split('/;\s*[\r\n]+/', $sql)),
+                fn ($s) => ! empty($s) && ! str_starts_with($s, '--') && ! str_starts_with($s, '/*')
+            );
+
+            foreach ($statements as $stmt) {
+                try {
+                    DB::unprepared($stmt);
+                } catch (\Exception $ignored) {
+                }
+            }
+
+            DB::statement('SET FOREIGN_KEY_CHECKS = 1');
+
+            return response()->json(['success' => true, 'message' => 'Database berhasil di-restore. Silakan refresh halaman.']);
+        } catch (\Exception $e) {
+            try { DB::statement('SET FOREIGN_KEY_CHECKS = 1'); } catch (\Exception $ignored) {}
+            return response()->json(['success' => false, 'message' => 'Restore gagal: ' . $e->getMessage()], 500);
+        }
     }
 }

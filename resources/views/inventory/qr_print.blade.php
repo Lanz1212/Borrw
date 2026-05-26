@@ -39,13 +39,13 @@
   <div class="item-meta">
     {{ $inventory->category }}<br>
     <span class="badge {{ $inventory->type === 'pinjam' ? 'badge-pinjam' : 'badge-consumable' }}">
-      {{ $inventory->type === 'pinjam' ? '🔄 Pinjam' : '🔥 Consumable' }}
+      {{ $inventory->type === 'pinjam' ? 'Pinjam' : 'Consumable' }}
     </span>
   </div>
 </div>
 
 <button class="print-btn" onclick="window.print()">
-  🖨️ Print / Simpan PDF
+  Print / Simpan PDF
 </button>
 
 <script>

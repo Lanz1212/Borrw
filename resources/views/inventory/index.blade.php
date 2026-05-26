@@ -8,8 +8,8 @@
     <div class="sw"><i class="bi bi-search"></i><input type="text" class="fc w-100" id="inv-q" placeholder="Cari barang..." oninput="loadInv()"></div>
     <select class="fs" id="inv-ft" onchange="loadInv()" style="min-width:150px;flex-shrink:0;">
       <option value="">Semua Jenis</option>
-      <option value="pinjam">🔄 Pinjam</option>
-      <option value="consumable">🔥 Consumable</option>
+      <option value="pinjam">Pinjam</option>
+      <option value="consumable">Consumable</option>
     </select>
   </div>
   <div class="d-flex gap-2 flex-wrap">
@@ -49,8 +49,8 @@
           <datalist id="cat-list" id="cat-list"></datalist>
           <div class="col-12 col-md-6"><label class="flbl">Jenis Barang *</label>
             <select id="inv-type" class="fs">
-              <option value="pinjam">🔄 Barang Pinjam (returnable)</option>
-              <option value="consumable">🔥 Consumable (habis pakai)</option>
+              <option value="pinjam">Barang Pinjam (returnable)</option>
+              <option value="consumable">Consumable (habis pakai)</option>
             </select>
           </div>
           <div class="col-12 col-md-4"><label class="flbl">Jumlah Total *</label><input type="number" id="inv-tot" class="fc" min="0" value="0"></div>
@@ -58,9 +58,9 @@
           <div class="col-12 col-md-4"><label class="flbl">Min Stok</label><input type="number" id="inv-mn" class="fc" min="0" value="0"></div>
           <div class="col-12 col-md-6"><label class="flbl">Kondisi</label>
             <select id="inv-cond" class="fs">
-              <option value="baik">✅ Baik</option>
-              <option value="perlu_perbaikan">⚠️ Perlu Perbaikan</option>
-              <option value="rusak">❌ Rusak</option>
+              <option value="baik">Baik</option>
+              <option value="perlu_perbaikan">Perlu Perbaikan</option>
+              <option value="rusak">Rusak</option>
             </select>
           </div>
           <div class="col-12 col-md-6"><label class="flbl">Catatan</label><input id="inv-nt" class="fc" placeholder="Opsional"></div>

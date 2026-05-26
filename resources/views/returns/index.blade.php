@@ -123,10 +123,25 @@ function loadRetItems(){
         </div>
       </label>
       <div id="rf-${d.id}" class="row g-2">
-        <div class="col-12 col-sm-4"><label class="flbl" style="font-size:11px;">Jml Kembali</label><input type="number" class="fc fc-sm w-100" id="rq-${d.id}" min="0" max="${rem}" value="${rem}"></div>
-        <div class="col-6 col-sm-4"><label class="flbl" style="font-size:11px;">Jml Rusak</label><input type="number" class="fc fc-sm w-100" id="rd-${d.id}" min="0" value="0"></div>
-        <div class="col-6 col-sm-4"><label class="flbl" style="font-size:11px;">Jml Hilang</label><input type="number" class="fc fc-sm w-100" id="rl-${d.id}" min="0" value="0"></div>
-        <div class="col-12"><label class="flbl" style="font-size:11px;">Catatan</label><input type="text" class="fc fc-sm w-100" id="rn-${d.id}" placeholder="Keterangan kondisi..."></div>
+        <div class="col-12 col-sm-4">
+          <label class="flbl" style="font-size:11px;">Jml Kembali <span style="font-size:10px;color:var(--muted);font-weight:400;">(otomatis)</span></label>
+          <input type="number" class="fc fc-sm w-100" id="rq-${d.id}" readonly value="${rem}" data-valid="1" data-rem="${rem}" style="background:#f0fdf4;color:#166534;font-weight:700;cursor:default;border-color:#bbf7d0;">
+        </div>
+        <div class="col-6 col-sm-4">
+          <label class="flbl" style="font-size:11px;">Jml Rusak</label>
+          <input type="number" class="fc fc-sm w-100" id="rd-${d.id}" min="0" max="${rem}" value="0" oninput="onRetFieldChange(${d.id},${rem})" onchange="onRetFieldChange(${d.id},${rem})">
+        </div>
+        <div class="col-6 col-sm-4">
+          <label class="flbl" style="font-size:11px;">Jml Hilang</label>
+          <input type="number" class="fc fc-sm w-100" id="rl-${d.id}" min="0" max="${rem}" value="0" oninput="onRetFieldChange(${d.id},${rem})" onchange="onRetFieldChange(${d.id},${rem})">
+        </div>
+        <div class="col-12" id="rerr-${d.id}" style="display:none;">
+          <div style="background:#fef2f2;border:1px solid #fecaca;border-radius:7px;padding:7px 10px;font-size:11.5px;color:#dc2626;display:flex;align-items:center;gap:6px;">
+            <i class="bi bi-exclamation-triangle-fill" style="flex-shrink:0;"></i>
+            <span id="rerr-txt-${d.id}"></span>
+          </div>
+        </div>
+        <div class="col-12"><label class="flbl" style="font-size:11px;">Catatan <span style="color:var(--danger);">*</span></label><input type="text" class="fc fc-sm w-100" id="rn-${d.id}" placeholder="Contoh: kembali utuh / rusak karena jatuh / hilang..."></div>
       </div>
     </div>`;
   }).join('');
@@ -139,15 +154,16 @@ async function submitRet(){
   if(!trx||!pending.length){toast('Tidak ada item untuk dikembalikan.','warning');return;}
   const items=[];
   for(const d of pending){
-    const chk=document.getElementById(`rc-${d.id}`);
+    const chk=document.getElementById('rc-'+d.id);
     if(!chk?.checked) continue;
-    const qr=parseInt(document.getElementById(`rq-${d.id}`)?.value)||0;
-    const qd=parseInt(document.getElementById(`rd-${d.id}`)?.value)||0;
-    const ql=parseInt(document.getElementById(`rl-${d.id}`)?.value)||0;
-    const nt=document.getElementById(`rn-${d.id}`)?.value||'';
-    if(qr<1){toast(`Jumlah kembali "${d.item_name}" minimal 1!`,'warning');return;}
-    if(qd+ql>qr){toast(`Rusak+hilang tidak boleh melebihi jumlah kembali untuk "${d.item_name}"!`,'warning');return;}
-    items.push({detail_id:d.id,qty_returned:qr,qty_damaged:qd,qty_lost:ql,notes:nt});
+    const rem=d.qty-(d.qty_returned||0);
+    const rusak=Math.max(0,Math.floor(parseFloat(document.getElementById('rd-'+d.id)?.value)||0));
+    const hilang=Math.max(0,Math.floor(parseFloat(document.getElementById('rl-'+d.id)?.value)||0));
+    const kembali=rem-rusak-hilang;
+    const nt=(document.getElementById('rn-'+d.id)?.value||'').trim();
+    if(kembali<0){toast(`Data tidak valid untuk "${d.item_name}": rusak+hilang melebihi sisa pinjam.`,'warning');return;}
+    if(!nt){const el=document.getElementById('rn-'+d.id);el&&(el.style.borderColor='var(--danger)',el.style.background='#fef2f2',el.focus());toast(`Catatan kondisi untuk "${d.item_name}" wajib diisi.`,'warning');return;}
+    items.push({detail_id:d.id,qty_returned:rem,qty_damaged:rusak,qty_lost:hilang,notes:nt});
   }
   if(!items.length){toast('Pilih minimal satu item untuk dikembalikan.','warning');return;}
   ld(true);
@@ -174,16 +190,60 @@ function onRetChk(id){
   updateRetBtn();
 }
 
+function onRetFieldChange(id,rem){
+  const rdEl=document.getElementById('rd-'+id);
+  const rlEl=document.getElementById('rl-'+id);
+  const rqEl=document.getElementById('rq-'+id);
+  const errBox=document.getElementById('rerr-'+id);
+  const errTxt=document.getElementById('rerr-txt-'+id);
+  // Sanitize: floor, clamp ≥ 0, treat empty/NaN as 0
+  let rusak=Math.max(0,Math.floor(parseFloat(rdEl.value)||0));
+  let hilang=Math.max(0,Math.floor(parseFloat(rlEl.value)||0));
+  if(rdEl.value!==''&&String(rdEl.value)!==String(rusak)) rdEl.value=rusak;
+  if(rlEl.value!==''&&String(rlEl.value)!==String(hilang)) rlEl.value=hilang;
+  const kembali=rem-rusak-hilang;
+  let valid=true;
+  // Reset styles
+  rdEl.style.borderColor='';rdEl.style.background='';
+  rlEl.style.borderColor='';rlEl.style.background='';
+  if(rusak+hilang>rem){
+    valid=false;
+    const excess=(rusak+hilang)-rem;
+    if(errTxt) errTxt.textContent=`Rusak + hilang (${rusak+hilang}) melebihi sisa pinjam (${rem}). Kurangi ${excess} unit.`;
+    rdEl.style.borderColor='var(--danger)';rdEl.style.background='#fef2f2';
+    rlEl.style.borderColor='var(--danger)';rlEl.style.background='#fef2f2';
+    rqEl.value=0;rqEl.style.background='#fef2f2';rqEl.style.color='var(--danger)';rqEl.style.borderColor='var(--danger)';
+  } else {
+    rqEl.value=kembali;
+    rqEl.style.background='#f0fdf4';rqEl.style.color='#166534';rqEl.style.borderColor='#bbf7d0';
+  }
+  if(errBox) errBox.style.display=valid?'none':'block';
+  if(rqEl) rqEl.dataset.valid=valid?'1':'0';
+  updateRetBtn();
+}
+
 function updateRetBtn(){
-  const cnt=document.querySelectorAll('.ret-chk:checked').length;
+  const checked=document.querySelectorAll('.ret-chk:checked');
+  const cnt=checked.length;
   const btn=document.getElementById('r-btn');
   if(!btn)return;
-  if(cnt>0){
+  let hasError=false;
+  checked.forEach(chk=>{
+    const rqEl=document.getElementById('rq-'+chk.id.replace('rc-',''));
+    if(rqEl&&rqEl.dataset.valid==='0') hasError=true;
+  });
+  if(cnt>0&&!hasError){
     btn.innerHTML=`<i class="bi bi-check-circle"></i> Proses Pengembalian (${cnt} item dipilih)`;
     btn.disabled=false;btn.style.opacity='1';btn.style.cursor='pointer';
+    btn.style.background='';
+  } else if(cnt>0&&hasError){
+    btn.innerHTML=`<i class="bi bi-exclamation-triangle"></i> Perbaiki data sebelum memproses`;
+    btn.disabled=true;btn.style.opacity='0.7';btn.style.cursor='not-allowed';
+    btn.style.background='var(--danger)';
   } else {
     btn.innerHTML=`<i class="bi bi-check-circle"></i> Pilih minimal 1 item`;
     btn.disabled=true;btn.style.opacity='0.55';btn.style.cursor='not-allowed';
+    btn.style.background='';
   }
 }
 

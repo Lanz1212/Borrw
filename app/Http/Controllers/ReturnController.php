@@ -81,6 +81,7 @@ class ReturnController extends Controller
                                 'item_name'        => $inv->name,
                                 'qty'              => $qtyDamaged,
                                 'description'      => 'Dari pengembalian transaksi ' . $transaction->transaction_code,
+                                'condition_notes'  => $item['notes'] ?? null,
                                 'transaction_id'   => $transaction->id,
                                 'reported_by'      => $user->id,
                                 'reported_by_name' => $user->name,

@@ -27,12 +27,13 @@ class DamagedController extends Controller
             ->get()
             ->map(function ($d) {
                 return [
-                    'id'           => $d->id,
-                    'inventory_id' => $d->inventory_id,
-                    'item_name'    => $d->item_name,
-                    'qty'          => $d->qty,
-                    'description'  => $d->description,
-                    'date'         => $d->created_at?->toISOString(),
+                    'id'              => $d->id,
+                    'inventory_id'    => $d->inventory_id,
+                    'item_name'       => $d->item_name,
+                    'qty'             => $d->qty,
+                    'description'     => $d->description,
+                    'condition_notes' => $d->condition_notes,
+                    'date'            => $d->created_at?->toISOString(),
                     'reported_by_name' => $d->reported_by_name,
                     'transaction_id'   => $d->transaction_id,
                     'transaction_code' => $d->transaction?->transaction_code,

@@ -120,14 +120,20 @@ function renderHistory(list){
 
 function showDetail(idx){
   const t = _histFiltered[idx]; if(!t) return;
-  const detailRows = (t.details||[]).map(d=>`<tr>
+  const detailRows = (t.details||[]).map(d=>{
+    const ret=d.qty_returned>0;
+    const good=d.qty_good??0, dmg=d.qty_damaged??0, lost=d.qty_lost??0;
+    return `<tr>
     <td style="font-weight:500;white-space:normal;min-width:140px;">${esc(d.item_name)}</td>
     <td><code style="font-size:10px;">${esc(d.item_code)}</code></td>
     <td><span class="bdg ${d.item_type==='pinjam'?'b-pinjam':'b-consumable'}"><i class="${d.item_type==='pinjam'?'bi bi-arrow-repeat':'bi bi-fire'}"></i> ${d.item_type==='pinjam'?'Pinjam':'Consumable'}</span></td>
     <td style="text-align:center;">${d.qty}</td>
-    <td style="text-align:center;">${d.qty_returned||0}</td>
+    <td style="text-align:center;font-weight:600;color:var(--success);">${ret?good:'—'}</td>
+    <td style="text-align:center;font-weight:${dmg>0?'700':'400'};color:${dmg>0?'var(--danger)':'var(--muted)'}">${ret?dmg:'—'}</td>
+    <td style="text-align:center;font-weight:${lost>0?'700':'400'};color:${lost>0?'var(--danger)':'var(--muted)'}">${ret?lost:'—'}</td>
     <td><span class="bdg b-${esc(d.status)}">${esc(statusLabel(d.status))}</span></td>
-  </tr>`).join('') || `<tr><td colspan="6" class="text-center" style="color:var(--muted);padding:16px;">Tidak ada item</td></tr>`;
+  </tr>${d.return_notes?`<tr><td colspan="8" style="padding:3px 12px 8px;background:rgba(249,115,22,.04);"><div style="font-size:11.5px;color:var(--muted);display:flex;align-items:flex-start;gap:5px;"><i class="bi bi-chat-left-text-fill" style="color:var(--accent);flex-shrink:0;margin-top:2px;"></i><span>${esc(d.return_notes)}</span></div></td></tr>`:''}`;
+  }).join('') || `<tr><td colspan="8" class="text-center" style="color:var(--muted);padding:16px;">Tidak ada item</td></tr>`;
 
   document.getElementById('mdl-trx-body').innerHTML = `
     <div class="detail-grid">
@@ -142,7 +148,7 @@ function showDetail(idx){
     ${t.signature?`<div style="margin-top:16px;"><div class="dg-lbl" style="font-size:11px;font-weight:600;margin-bottom:6px;">TANDA TANGAN PEMINJAM</div><div id="sig-box" style="border:1.5px solid var(--border);border-radius:8px;padding:8px;display:inline-block;background:#fff;min-height:36px;"></div></div>`:''}
     <div style="font-weight:700;font-size:13px;margin-bottom:10px;margin-top:20px;"><i class="bi bi-box-seam text-primary"></i> Daftar Barang</div>
     <div class="tw"><table class="table">
-      <thead><tr><th>Nama Barang</th><th>Kode</th><th>Jenis</th><th style="text-align:center;">Jml</th><th style="text-align:center;">Kembali</th><th>Status</th></tr></thead>
+      <thead><tr><th>Nama Barang</th><th>Kode</th><th>Jenis</th><th style="text-align:center;">Jml</th><th style="text-align:center;">Baik</th><th style="text-align:center;">Rusak</th><th style="text-align:center;">Hilang</th><th>Status</th></tr></thead>
       <tbody>${detailRows}</tbody>
     </table></div>`;
   if(t.signature) renderSig(t.signature, document.getElementById('sig-box'));

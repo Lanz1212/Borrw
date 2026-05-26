@@ -19,7 +19,7 @@ Route::post('/logout', [AuthController::class, 'logout'])->name('logout')->middl
 
 Route::get('/', function () {
     if (!auth()->check()) return redirect()->route('login');
-    return redirect()->route(auth()->user()->isAdmin() ? 'dashboard' : 'transactions.index');
+    return redirect()->route('dashboard');
 });
 
 // Protected
@@ -40,12 +40,12 @@ Route::middleware('auth')->group(function () {
     Route::get('/returns', [ReturnController::class, 'index'])->name('returns.index');
     Route::post('/returns', [ReturnController::class, 'store'])->name('returns.store');
 
+    // Dashboard — both roles
+    Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
+    Route::get('/dashboard/stats', [DashboardController::class, 'stats'])->name('dashboard.stats');
+
     // Admin-only routes
     Route::middleware('role:admin')->group(function () {
-
-        // Dashboard
-        Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
-        Route::get('/dashboard/stats', [DashboardController::class, 'stats'])->name('dashboard.stats');
 
         // Inventory management
         Route::get('/inventory', [InventoryController::class, 'index'])->name('inventory.index');
@@ -84,5 +84,7 @@ Route::middleware('auth')->group(function () {
         Route::get('/settings', [SettingController::class, 'index'])->name('settings.index');
         Route::get('/settings/data', [SettingController::class, 'data'])->name('settings.data');
         Route::post('/settings', [SettingController::class, 'update'])->name('settings.update');
+        Route::get('/settings/backup', [SettingController::class, 'backup'])->name('settings.backup');
+        Route::post('/settings/restore', [SettingController::class, 'restore'])->name('settings.restore');
     });
 });

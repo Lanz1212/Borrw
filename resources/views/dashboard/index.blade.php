@@ -41,7 +41,7 @@
       <div class="d-flex flex-wrap gap-2">
         <a href="{{ route('transactions.index') }}" class="b-acc flex-grow-1 flex-md-grow-0"><i class="bi bi-plus-circle"></i> Transaksi Baru</a>
         <a href="{{ route('returns.index') }}" class="b-out flex-grow-1 flex-md-grow-0"><i class="bi bi-arrow-return-left"></i> Pengembalian</a>
-        <a href="{{ route('inventory.index') }}" class="b-out flex-grow-1 flex-md-grow-0"><i class="bi bi-box-seam"></i> Inventori</a>
+        ${IS_ADMIN ? `<a href="{{ route('inventory.index') }}" class="b-out flex-grow-1 flex-md-grow-0"><i class="bi bi-box-seam"></i> Inventori</a>` : ''}
       </div>
     </div>`;
 

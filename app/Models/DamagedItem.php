@@ -7,7 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 class DamagedItem extends Model
 {
     protected $fillable = [
-        'inventory_id', 'item_name', 'qty', 'description',
+        'inventory_id', 'item_name', 'qty', 'description', 'condition_notes',
         'transaction_id', 'reported_by', 'reported_by_name',
     ];
 

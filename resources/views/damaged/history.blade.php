@@ -143,7 +143,8 @@ function showDmgDetail(idx){
       <div class="detail-grid" style="margin-bottom:0;">
         <div><div class="dg-lbl">ID Transaksi</div><code style="font-size:12px;word-break:break-all;">${esc(d.transaction_code||'—')}</code></div>
         <div><div class="dg-lbl">Peminjam</div><div class="dg-val">${esc(d.borrower_name||'—')}</div></div>
-        <div class="dg-full"><div class="dg-lbl">Tanggal Pinjam</div><div class="dg-val">${fdt(d.loan_date)}</div></div>
+        <div><div class="dg-lbl">Tanggal Pinjam</div><div class="dg-val">${fdt(d.loan_date)}</div></div>
+        <div><div class="dg-lbl">Catatan Kondisi</div><div class="dg-val">${d.condition_notes?esc(d.condition_notes):'<span style="color:var(--muted);font-style:italic;font-size:12px;">—</span>'}</div></div>
       </div>
     </div>`:`
     <div style="background:var(--bg);border-radius:10px;padding:12px 14px;font-size:13px;color:var(--muted);margin-top:4px;">

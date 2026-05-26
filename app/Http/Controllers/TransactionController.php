@@ -23,7 +23,7 @@ class TransactionController extends Controller
 
     public function data(Request $request): JsonResponse
     {
-        $query = Transaction::with('details')->orderByDesc('created_at');
+        $query = Transaction::with(['details.returns'])->orderByDesc('created_at');
 
         if ($status = $request->status) {
             $query->where('status', $status);
@@ -57,6 +57,10 @@ class TransactionController extends Controller
                     'qty'          => $d->qty,
                     'status'       => $d->status,
                     'qty_returned' => $d->qty_returned,
+                    'qty_good'     => $d->returns->sum('qty_good'),
+                    'qty_damaged'  => $d->returns->sum('qty_damaged'),
+                    'qty_lost'     => $d->returns->sum('qty_lost'),
+                    'return_notes' => $d->returns->pluck('notes')->filter()->join('; '),
                     'return_date'  => $d->return_date?->toISOString(),
                 ]),
             ];
