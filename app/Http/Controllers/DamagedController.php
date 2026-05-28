@@ -22,13 +22,14 @@ class DamagedController extends Controller
 
     public function data(): JsonResponse
     {
-        $items = DamagedItem::with('transaction')
+        $items = DamagedItem::with(['transaction', 'inventory'])
             ->orderByDesc('created_at')
             ->get()
             ->map(function ($d) {
                 return [
                     'id'              => $d->id,
                     'inventory_id'    => $d->inventory_id,
+                    'item_code'       => $d->inventory?->code ?? '',
                     'item_name'       => $d->item_name,
                     'qty'             => $d->qty,
                     'description'     => $d->description,

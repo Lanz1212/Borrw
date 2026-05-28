@@ -158,17 +158,67 @@ function showDetail(idx){
 function exportHistory(){
   if(!_histFiltered.length){toast('Tidak ada data untuk diekspor.','warning');return;}
   const rows=[
-    ['ID Transaksi','Peminjam','Tanggal Pinjam','Tanggal Kembali','Status','Catatan','Dicatat Oleh'],
-    ..._histFiltered.map(t=>[
-      t.transaction_code,
-      t.borrower_name,
-      t.loan_date ? new Date(t.loan_date).toLocaleDateString('id-ID') : '',
-      t.return_date ? new Date(t.return_date).toLocaleDateString('id-ID') : '',
-      statusLabel(t.status),
-      t.notes||'',
-      t.created_by_name||''
-    ])
+    [
+      'ID Transaksi',
+      'Peminjam',
+      'Diproses Oleh',
+      'Tanggal Pinjam',
+      'Kode Barang',
+      'Nama Barang',
+      'Jenis',
+      'Jumlah Pinjam',
+      'Jumlah Kembali',
+      'Kondisi Baik',
+      'Kondisi Rusak',
+      'Hilang',
+      'Status Barang',
+      'Tanggal Kembali',
+      'Catatan Pengembalian',
+      'Status Transaksi',
+      'Catatan Transaksi',
+    ]
   ];
+
+  _histFiltered.forEach(t=>{
+    const details = t.details || [];
+    if(!details.length){
+      // Transaksi tanpa detail barang — tetap masukkan 1 baris
+      rows.push([
+        t.transaction_code || '',
+        t.borrower_name    || '',
+        t.created_by_name  || '',
+        t.loan_date ? new Date(t.loan_date).toLocaleDateString('id-ID') : '',
+        '', '', '', '', '', '', '', '', '', '',
+        t.return_date ? new Date(t.return_date).toLocaleDateString('id-ID') : '',
+        statusLabel(t.status),
+        t.notes || '',
+      ]);
+    } else {
+      details.forEach(d=>{
+        const returned = d.qty_returned > 0;
+        rows.push([
+          t.transaction_code          || '',
+          t.borrower_name             || '',
+          t.created_by_name           || '',
+          t.loan_date ? new Date(t.loan_date).toLocaleDateString('id-ID') : '',
+          d.item_code                 || '',
+          d.item_name                 || '',
+          d.item_type === 'pinjam' ? 'Pinjam' : 'Consumable',
+          d.qty,
+          returned ? d.qty_returned   : '',
+          returned ? (d.qty_good  ?? 0) : '',
+          returned ? (d.qty_damaged ?? 0) : '',
+          returned ? (d.qty_lost  ?? 0) : '',
+          statusLabel(d.status),
+          d.return_date ? new Date(d.return_date).toLocaleDateString('id-ID') : '',
+          d.return_notes || '',
+          statusLabel(t.status),
+          t.notes || '',
+        ]);
+      });
+    }
+  });
+
   exportXlsx(rows,'Riwayat_Transaksi_'+dateStr()+'.xlsx');
   toast('Export berhasil diunduh.');
 }

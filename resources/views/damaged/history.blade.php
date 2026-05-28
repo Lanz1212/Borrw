@@ -156,16 +156,35 @@ function showDmgDetail(idx){
 function exportDmgH(){
   if(!_dmgFiltered.length){toast('Tidak ada data untuk diekspor.','warning');return;}
   const rows=[
-    ['Tanggal','Nama Barang','Kode Barang','Jumlah','Keterangan','Dicatat Oleh','Sumber'],
-    ..._dmgFiltered.map(d=>[
-      d.date ? new Date(d.date).toLocaleDateString('id-ID') : '',
-      d.item_name,
-      d.item_code||'',
-      d.qty,
-      d.description||'',
-      d.reported_by_name||'',
-      d.transaction_id ? 'Dari Pengembalian' : 'Manual'
-    ])
+    [
+      'Tanggal Dicatat',
+      'Kode Barang',
+      'Nama Barang',
+      'Jumlah Rusak',
+      'Sumber',
+      'ID Transaksi',
+      'Peminjam',
+      'Tanggal Pinjam',
+      'Catatan Kondisi',
+      'Keterangan',
+      'Dicatat Oleh',
+    ],
+    ..._dmgFiltered.map(d=>{
+      const fromTrx = d.transaction_id && d.transaction_id !== '';
+      return [
+        d.date ? new Date(d.date).toLocaleDateString('id-ID') : '',
+        d.item_code || '',
+        d.item_name || '',
+        d.qty,
+        fromTrx ? 'Dari Pengembalian' : 'Manual',
+        fromTrx ? (d.transaction_code || '') : '',
+        fromTrx ? (d.borrower_name   || '') : '',
+        fromTrx && d.loan_date ? new Date(d.loan_date).toLocaleDateString('id-ID') : '',
+        d.condition_notes || '',
+        d.description     || '',
+        d.reported_by_name || '',
+      ];
+    })
   ];
   exportXlsx(rows,'Riwayat_Rusak_'+dateStr()+'.xlsx');
   toast('Export berhasil diunduh.');
