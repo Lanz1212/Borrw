@@ -173,7 +173,8 @@ async function initTrx(){
     document.getElementById('qs-aktif').textContent   = aktif;
     document.getElementById('qs-done').textContent    = done;
     document.getElementById('qs-partial').textContent = partial;
-    renderTrxRows(_trxStore.filter(t=>t.status!=='menunggu_persetujuan'&&t.status!=='ditolak').slice(0,8));
+    // Tampilkan semua transaksi (termasuk ditolak) kecuali yang masih menunggu persetujuan
+    renderTrxRows(_trxStore.filter(t=>t.status!=='menunggu_persetujuan').slice(0,8));
     @if(auth()->user()->isAdmin())
     renderPending(results[3]?.data || []);
     @endif
@@ -225,7 +226,8 @@ function renderTrxRows(list){
     tb.innerHTML=`<tr><td colspan="5"><div class="empty"><div class="ei"><i class="bi bi-clipboard2-data"></i></div><p>Belum ada transaksi</p></div></td></tr>`;
     return;
   }
-  tb.innerHTML = list.map((t,idx)=>`<tr class="tr-click" onclick="showTrxDetail(${idx})" title="Klik untuk detail">
+  // Bug fix: gunakan t.id (bukan index array) agar detail selalu tampil untuk transaksi yang benar
+  tb.innerHTML = list.map(t=>`<tr class="tr-click" onclick="showTrxDetail(${t.id})" title="Klik untuk detail">
     <td><code style="font-size:10px;">${esc(t.transaction_code)}</code></td>
     <td>${esc(t.borrower_name)}</td>
     <td>${fdt(t.loan_date)}</td>
@@ -234,8 +236,9 @@ function renderTrxRows(list){
   </tr>`).join('');
 }
 
-function showTrxDetail(idx){
-  const t = _trxStore[idx]; if(!t) return;
+function showTrxDetail(id){
+  // Bug fix: cari berdasarkan ID transaksi, bukan index array
+  const t = _trxStore.find(x=>x.id===id); if(!t) return;
   const detailRows = (t.details||[]).map(d=>{
     const ret=d.qty_returned>0;
     const good=d.qty_good??0, dmg=d.qty_damaged??0, lost=d.qty_lost??0;
@@ -417,7 +420,8 @@ async function submitTrx(){
     document.getElementById('qs-aktif').textContent  =nonP.filter(t=>t.status==='aktif').length;
     document.getElementById('qs-done').textContent   =nonP.filter(t=>t.status==='selesai').length;
     document.getElementById('qs-partial').textContent=nonP.filter(t=>t.status==='partial').length;
-    renderTrxRows(nonP.slice(0,8));
+    // Tampilkan semua (termasuk ditolak) kecuali menunggu persetujuan
+    renderTrxRows(_trxStore.filter(t=>t.status!=='menunggu_persetujuan').slice(0,8));
     @if(auth()->user()->isAdmin())
     const pendR=await api('{{ route("transactions.pending") }}');
     renderPending(pendR.data||[]);

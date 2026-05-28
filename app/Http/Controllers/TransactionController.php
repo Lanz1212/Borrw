@@ -230,6 +230,10 @@ class TransactionController extends Controller
 
         $transaction->update(['status' => 'ditolak']);
 
+        // Update semua detail barang menjadi 'ditolak' agar tidak tampil sebagai "dipakai"
+        TransactionDetail::where('transaction_id', $transaction->id)
+            ->update(['status' => 'ditolak']);
+
         return response()->json(['success' => true, 'message' => 'Transaksi ditolak.']);
     }
 
