@@ -7,13 +7,26 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 
+/**
+ * Controller UserController
+ * 
+ * Mengelola data pengguna sistem (admin dan user biasa).
+ */
 class UserController extends Controller
 {
+    /**
+     * Menampilkan halaman daftar pengguna.
+     */
     public function index()
     {
         return view('users.index');
     }
 
+    /**
+     * Mengambil daftar pengguna (API) untuk ditampilkan pada tabel.
+     * 
+     * @return JsonResponse
+     */
     public function data(): JsonResponse
     {
         $users = User::orderBy('name')
@@ -31,6 +44,12 @@ class UserController extends Controller
         return response()->json(['success' => true, 'data' => $users]);
     }
 
+    /**
+     * Menyimpan data pengguna baru ke database.
+     * 
+     * @param Request $request
+     * @return JsonResponse
+     */
     public function store(Request $request): JsonResponse
     {
         $request->validate([
@@ -46,6 +65,7 @@ class UserController extends Controller
             'name'     => $request->name,
             'username' => $request->username,
             'email'    => $request->email,
+            // Hashing password sebelum disimpan ke database
             'password' => Hash::make($request->password),
             'role'     => $request->role,
             'active'   => $request->boolean('active', true),
@@ -54,6 +74,14 @@ class UserController extends Controller
         return response()->json(['success' => true, 'message' => 'User berhasil ditambahkan.', 'data' => $user->only(['id', 'name', 'username', 'role', 'active'])]);
     }
 
+    /**
+     * Memperbarui data pengguna yang ada.
+     * Mendukung update password opsional (jika diisi).
+     * 
+     * @param Request $request
+     * @param User $user
+     * @return JsonResponse
+     */
     public function update(Request $request, User $user): JsonResponse
     {
         $request->validate([
@@ -70,6 +98,7 @@ class UserController extends Controller
             'active' => $request->boolean('active', true),
         ];
 
+        // Jika password diisi, maka update password (hash terlebih dahulu)
         if ($request->password) {
             $request->validate(['password' => 'string|min:6']);
             $updateData['password'] = Hash::make($request->password);
@@ -80,8 +109,16 @@ class UserController extends Controller
         return response()->json(['success' => true, 'message' => 'User berhasil diupdate.']);
     }
 
+    /**
+     * Menghapus pengguna dari sistem.
+     * Mencegah pengguna menghapus akunnya sendiri yang sedang login.
+     * 
+     * @param User $user
+     * @return JsonResponse
+     */
     public function destroy(User $user): JsonResponse
     {
+        // Validasi agar admin tidak bisa menghapus akunnya sendiri secara tidak sengaja
         if ($user->id === auth()->id()) {
             return response()->json(['success' => false, 'message' => 'Tidak bisa menghapus akun sendiri.'], 422);
         }

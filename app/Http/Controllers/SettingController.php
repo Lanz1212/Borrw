@@ -7,19 +7,38 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
+/**
+ * Controller SettingController
+ * 
+ * Mengelola konfigurasi aplikasi, serta fungsionalitas backup dan restore database.
+ */
 class SettingController extends Controller
 {
+    /**
+     * Menampilkan halaman pengaturan aplikasi.
+     */
     public function index()
     {
         return view('settings.index');
     }
 
+    /**
+     * Mengambil semua pengaturan yang tersimpan di database dalam bentuk key-value pair.
+     * 
+     * @return JsonResponse
+     */
     public function data(): JsonResponse
     {
         $settings = Setting::all()->pluck('value', 'key');
         return response()->json(['success' => true, 'data' => $settings]);
     }
 
+    /**
+     * Memperbarui pengaturan aplikasi.
+     * 
+     * @param Request $request
+     * @return JsonResponse
+     */
     public function update(Request $request): JsonResponse
     {
         $request->validate([
@@ -41,6 +60,11 @@ class SettingController extends Controller
         return response()->json(['success' => true, 'message' => 'Pengaturan berhasil disimpan.']);
     }
 
+    /**
+     * Mengunduh file backup (dump) dari seluruh database.
+     * 
+     * @return \Illuminate\Http\Response
+     */
     public function backup(): \Illuminate\Http\Response
     {
         $dbName   = config('database.connections.mysql.database');
@@ -56,6 +80,12 @@ class SettingController extends Controller
         ]);
     }
 
+    /**
+     * Menghasilkan teks SQL mentah untuk seluruh struktur tabel dan data.
+     * Proses otomatis ini membuat query DROP TABLE, CREATE TABLE, dan INSERT.
+     * 
+     * @return string
+     */
     private function generateSqlDump(): string
     {
         $out    = [];
@@ -97,6 +127,7 @@ class SettingController extends Controller
             $cols     = '`' . implode('`, `', array_keys($firstRow)) . '`';
             $out[]    = "-- Data for `{$table}`";
 
+            // Melakukan chunking agar proses dump data yang besar tidak menyebabkan memory limit
             foreach ($rows->chunk(500) as $chunk) {
                 $valLines = $chunk->map(function ($row) {
                     $escaped = array_map(function ($v) {
@@ -125,6 +156,13 @@ class SettingController extends Controller
         return implode("\n", $out);
     }
 
+    /**
+     * Memulihkan (restore) database dari file SQL yang diunggah.
+     * Menggunakan metode DB::unprepared untuk mengeksekusi multiple statement.
+     * 
+     * @param Request $request
+     * @return JsonResponse
+     */
     public function restore(Request $request): JsonResponse
     {
         $request->validate(['sql_file' => 'required|file|max:102400']);
@@ -142,8 +180,10 @@ class SettingController extends Controller
         }
 
         try {
+            // Nonaktifkan pemeriksaan foreign key sementara agar proses restore tidak gagal
             DB::statement('SET FOREIGN_KEY_CHECKS = 0');
 
+            // Memisahkan query berdasarkan karakter titik koma (;)
             $statements = array_filter(
                 array_map('trim', preg_split('/;\s*[\r\n]+/', $sql)),
                 fn ($s) => ! empty($s) && ! str_starts_with($s, '--') && ! str_starts_with($s, '/*')
@@ -153,6 +193,7 @@ class SettingController extends Controller
                 try {
                     DB::unprepared($stmt);
                 } catch (\Exception $ignored) {
+                    // Abaikan error pada statement tertentu (misalnya data sudah ada)
                 }
             }
 

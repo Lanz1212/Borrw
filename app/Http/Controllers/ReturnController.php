@@ -11,18 +11,34 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
+/**
+ * Controller ReturnController
+ * 
+ * Mengelola proses pengembalian barang dari peminjam, termasuk pencatatan kondisi barang dan penyesuaian stok.
+ */
 class ReturnController extends Controller
 {
+    /**
+     * Menampilkan halaman proses pengembalian barang.
+     */
     public function index()
     {
         return view('returns.index');
     }
 
+    /**
+     * Memproses form submit pengembalian barang.
+     * Mengelola penambahan stok (barang baik) maupun pengurangan stok (barang rusak/hilang).
+     * Dibungkus dengan Database Transaction untuk keamanan data.
+     * 
+     * @param Request $request
+     * @return JsonResponse
+     */
     public function store(Request $request): JsonResponse
     {
         $request->validate([
-            'transaction_id' => 'required|exists:transactions,id',
-            'items'          => 'required|array|min:1',
+            'transaction_id'       => 'required|exists:transactions,id',
+            'items'                => 'required|array|min:1',
             'items.*.detail_id'    => 'required|exists:transaction_details,id',
             'items.*.qty_returned' => 'required|integer|min:1',
             'items.*.qty_damaged'  => 'nullable|integer|min:0',
@@ -35,16 +51,21 @@ class ReturnController extends Controller
             $transaction = Transaction::find($request->transaction_id);
 
             foreach ($request->items as $item) {
-                $detail     = TransactionDetail::lockForUpdate()->find($item['detail_id']);
+                // Mengunci baris detail transaksi untuk mencegah update simultan (race conditions)
+                $detail      = TransactionDetail::lockForUpdate()->find($item['detail_id']);
                 $qtyReturned = (int) $item['qty_returned'];
                 $qtyDamaged  = (int) ($item['qty_damaged'] ?? 0);
                 $qtyLost     = (int) ($item['qty_lost'] ?? 0);
+                
+                // Barang dianggap "baik" jika dikembalikan tapi tidak rusak/hilang
                 $qtyGood     = $qtyReturned - $qtyDamaged - $qtyLost;
 
+                // Validasi logis: jumlah rusak dan hilang tidak boleh melebihi jumlah barang yang dikembalikan
                 if ($qtyGood < 0) {
                     return response()->json(['success' => false, 'message' => "Rusak + hilang melebihi jumlah kembali untuk \"{$detail->item_name}\"."], 422);
                 }
 
+                // Kalkulasi total yang telah dikembalikan sejauh ini
                 $newQtyReturned = $detail->qty_returned + $qtyReturned;
                 $newStatus      = $newQtyReturned >= $detail->qty ? 'kembali' : 'partial';
 
@@ -54,6 +75,7 @@ class ReturnController extends Controller
                     'return_date'  => now(),
                 ]);
 
+                // Mencatat data riwayat pengembalian per item (historical data)
                 ItemReturn::create([
                     'transaction_id'        => $transaction->id,
                     'transaction_detail_id' => $detail->id,
@@ -72,7 +94,10 @@ class ReturnController extends Controller
                 if ($detail->inventory_id) {
                     $inv = Inventory::lockForUpdate()->find($detail->inventory_id);
                     if ($inv) {
+                        // Tambahkan kembali qty barang yang kondisinya baik (layak pakai)
                         $inv->increment('available_qty', $qtyGood);
+                        
+                        // Jika ada barang yang rusak, catat ke tabel kerusakan dan kurangi total kapasitas inventaris
                         if ($qtyDamaged > 0) {
                             $inv->decrement('total_qty', $qtyDamaged);
 
@@ -91,6 +116,7 @@ class ReturnController extends Controller
                 }
             }
 
+            // Memperbarui status transaksi induk (apakah masih aktif/partial atau sudah selesai total)
             $this->updateTransactionStatus($transaction);
 
             DB::table('transactions')->where('id', $transaction->id)->update(['return_date' => now(), 'updated_at' => now()]);
@@ -99,15 +125,24 @@ class ReturnController extends Controller
         });
     }
 
+    /**
+     * Memeriksa dan memperbarui status transaksi secara keseluruhan
+     * berdasarkan status pengembalian setiap barang (details).
+     * 
+     * @param Transaction $transaction
+     */
     private function updateTransactionStatus(Transaction $transaction): void
     {
+        // Hanya memproses item bertipe 'pinjam' (karena consumable/habis pakai tidak dikembalikan)
         $pinjamDetails = $transaction->details()->where('item_type', 'pinjam')->get();
 
         if ($pinjamDetails->isEmpty()) {
             return;
         }
 
+        // Cek apakah seluruh barang sudah dikembalikan
         $allReturned = $pinjamDetails->every(fn($d) => $d->status === 'kembali');
+        // Cek apakah ada setidaknya satu barang yang sudah dikembalikan (tapi tidak semua)
         $anyReturned = $pinjamDetails->some(fn($d) => $d->status === 'kembali');
 
         $status = $allReturned ? 'selesai' : ($anyReturned ? 'partial' : 'aktif');

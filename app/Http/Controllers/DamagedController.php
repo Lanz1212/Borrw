@@ -8,24 +8,41 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
+/**
+ * Controller DamagedController
+ * 
+ * Mengelola pelaporan dan pencatatan barang rusak, termasuk penyesuaian stok secara otomatis.
+ */
 class DamagedController extends Controller
 {
+    /**
+     * Menampilkan halaman formulir untuk melaporkan barang rusak.
+     */
     public function index()
     {
         return view('damaged.index');
     }
 
+    /**
+     * Menampilkan halaman riwayat pelaporan barang rusak.
+     */
     public function history()
     {
         return view('damaged.history');
     }
 
+    /**
+     * Mengambil daftar riwayat barang rusak (API) berserta data transaksi terkait.
+     * 
+     * @return JsonResponse
+     */
     public function data(): JsonResponse
     {
         $items = DamagedItem::with(['transaction', 'inventory'])
             ->orderByDesc('created_at')
             ->get()
             ->map(function ($d) {
+                // Memformat response dengan mem-flatten data relasional
                 return [
                     'id'              => $d->id,
                     'inventory_id'    => $d->inventory_id,
@@ -46,19 +63,32 @@ class DamagedController extends Controller
         return response()->json(['success' => true, 'data' => $items]);
     }
 
+    /**
+     * Mencatat laporan kerusakan barang baru dan mengurangi stok persediaan (inventory).
+     * Dibungkus dengan Database Transaction untuk mencegah data tidak konsisten.
+     * 
+     * @param Request $request
+     * @return JsonResponse
+     */
     public function store(Request $request): JsonResponse
     {
+        // Validasi payload request
         $request->validate([
             'inventory_id' => 'required|exists:inventory,id',
             'qty'          => 'required|integer|min:1',
             'description'  => 'required|string',
         ]);
 
+        // Eksekusi DB transaction: Jika salah satu proses gagal, seluruh perubahan dibatalkan (rollback)
         return DB::transaction(function () use ($request) {
             $user = auth()->user();
+            
+            // lockForUpdate() digunakan untuk mencegah race condition (misalnya ada pengurangan stok yang terjadi bersamaan)
             $inv  = Inventory::lockForUpdate()->find($request->inventory_id);
 
             $qty = (int) $request->qty;
+            
+            // Proses kalkulasi pengurangang stok (baik total maupun available qty)
             $newTotal     = max(0, $inv->total_qty - $qty);
             $newAvailable = max(0, $inv->available_qty - $qty);
 
@@ -67,6 +97,7 @@ class DamagedController extends Controller
                 'available_qty' => $newAvailable,
             ]);
 
+            // Mencatat log barang rusak ke dalam tabel damaged_items
             $damaged = DamagedItem::create([
                 'inventory_id'     => $inv->id,
                 'item_name'        => $inv->name,

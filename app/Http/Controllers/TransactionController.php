@@ -9,18 +9,36 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
+/**
+ * Controller TransactionController
+ * 
+ * Mengelola proses pembuatan, persetujuan, dan pencatatan transaksi peminjaman barang.
+ */
 class TransactionController extends Controller
 {
+    /**
+     * Menampilkan halaman manajemen transaksi aktif.
+     */
     public function index()
     {
         return view('transactions.index');
     }
 
+    /**
+     * Menampilkan halaman riwayat transaksi (sudah selesai/ditolak).
+     */
     public function history()
     {
         return view('transactions.history');
     }
 
+    /**
+     * Mengambil data daftar transaksi (API) untuk tabel.
+     * Termasuk memuat (eager-load) relasi details dan item returns.
+     * 
+     * @param Request $request
+     * @return JsonResponse
+     */
     public function data(Request $request): JsonResponse
     {
         $query = Transaction::with(['details.returns'])->orderByDesc('created_at');
@@ -29,6 +47,7 @@ class TransactionController extends Controller
             $query->where('status', $status);
         }
 
+        // Pencarian transaksi berdasarkan kode transaksi atau nama peminjam
         if ($search = $request->q) {
             $query->where(function ($q) use ($search) {
                 $q->where('transaction_code', 'like', "%{$search}%")
@@ -37,6 +56,7 @@ class TransactionController extends Controller
         }
 
         $transactions = $query->limit(50)->get()->map(function ($t) {
+            // Memformat output agar lebih mudah dikonsumsi frontend (termasuk mapping relasi details)
             return [
                 'id'           => $t->id,
                 'transaction_code' => $t->transaction_code,
@@ -69,6 +89,14 @@ class TransactionController extends Controller
         return response()->json(['success' => true, 'data' => $transactions]);
     }
 
+    /**
+     * Membuat transaksi peminjaman baru (Checkout Cart).
+     * Jika admin: Langsung diproses (stok dikurangi).
+     * Jika user biasa: Masuk status 'menunggu_persetujuan' (stok belum dikurangi).
+     * 
+     * @param Request $request
+     * @return JsonResponse
+     */
     public function store(Request $request): JsonResponse
     {
         $request->validate([
@@ -84,13 +112,16 @@ class TransactionController extends Controller
 
         $isAdmin = auth()->user()->isAdmin();
 
+        // Menggunakan Database Transaction untuk mencegah inkonsistensi data jika insert gagal
         return DB::transaction(function () use ($request, $isAdmin) {
             $cart = $request->cart;
 
             $allConsumable = true;
             $inventoryMap  = [];
 
+            // Pra-validasi ketersediaan stok
             foreach ($cart as $cartItem) {
+                // lockForUpdate digunakan agar stok barang terkunci dan tidak dimodifikasi proses lain pada waktu bersamaan
                 $inv = Inventory::lockForUpdate()->find($cartItem['inventory_id']);
                 if (!$inv) {
                     return response()->json(['success' => false, 'message' => "Barang ID {$cartItem['inventory_id']} tidak ditemukan."], 422);
@@ -105,8 +136,10 @@ class TransactionController extends Controller
             }
 
             $user   = auth()->user();
+            // Generate kode transaksi unik otomatis
             $code   = 'TRX-' . now()->format('Ymd') . '-' . str_pad(rand(1000, 9999), 4, '0', STR_PAD_LEFT);
 
+            // Logika bisnis:
             // Admin: langsung aktif/selesai. User: menunggu persetujuan admin.
             $status = $isAdmin
                 ? ($allConsumable ? 'selesai' : 'aktif')
@@ -124,6 +157,7 @@ class TransactionController extends Controller
                 'signature'        => $request->signature,
             ]);
 
+            // Menyimpan detail transaksi untuk masing-masing barang (cart)
             foreach ($cart as $cartItem) {
                 $inv          = $inventoryMap[$cartItem['inventory_id']];
                 $detailStatus = $inv->type === 'pinjam' ? 'dipinjam' : 'dipakai';
@@ -139,7 +173,7 @@ class TransactionController extends Controller
                     'qty_returned'   => 0,
                 ]);
 
-                // Stok hanya dikurangi jika admin yang membuat (langsung aktif)
+                // Stok hanya dikurangi secara langsung jika admin yang membuat transaksi (langsung aktif)
                 if ($isAdmin) {
                     $inv->decrement('available_qty', $cartItem['qty']);
                 }
@@ -158,6 +192,11 @@ class TransactionController extends Controller
         });
     }
 
+    /**
+     * Mengambil daftar transaksi (API) yang masih berstatus menunggu persetujuan.
+     * 
+     * @return JsonResponse
+     */
     public function pending(): JsonResponse
     {
         $transactions = Transaction::with('details')
@@ -182,6 +221,13 @@ class TransactionController extends Controller
         return response()->json(['success' => true, 'data' => $transactions]);
     }
 
+    /**
+     * Menyetujui transaksi (approve) yang masih pending.
+     * Proses ini akan secara resmi mengurangi stok barang.
+     * 
+     * @param Transaction $transaction
+     * @return JsonResponse
+     */
     public function approve(Transaction $transaction): JsonResponse
     {
         if ($transaction->status !== 'menunggu_persetujuan') {
@@ -191,6 +237,7 @@ class TransactionController extends Controller
         return DB::transaction(function () use ($transaction) {
             $allConsumable = true;
 
+            // Validasi ulang stok sebelum persetujuan karena stok bisa saja berkurang selama transaksi pending
             foreach ($transaction->details as $detail) {
                 $inv = Inventory::lockForUpdate()->find($detail->inventory_id);
                 if (!$inv) {
@@ -206,6 +253,7 @@ class TransactionController extends Controller
                 }
             }
 
+            // Kurangi stok barang karena transaksi disetujui
             foreach ($transaction->details as $detail) {
                 $inv = Inventory::find($detail->inventory_id);
                 if ($inv) {
@@ -213,6 +261,7 @@ class TransactionController extends Controller
                 }
             }
 
+            // Update status transaksi menjadi aktif atau langsung selesai (jika hanya berisi barang habis pakai/consumable)
             $transaction->update([
                 'status'          => $allConsumable ? 'selesai' : 'aktif',
                 'created_by_name' => $transaction->created_by_name . ' (disetujui)',
@@ -222,6 +271,12 @@ class TransactionController extends Controller
         });
     }
 
+    /**
+     * Menolak (reject) transaksi yang pending.
+     * 
+     * @param Transaction $transaction
+     * @return JsonResponse
+     */
     public function reject(Transaction $transaction): JsonResponse
     {
         if ($transaction->status !== 'menunggu_persetujuan') {
@@ -230,13 +285,19 @@ class TransactionController extends Controller
 
         $transaction->update(['status' => 'ditolak']);
 
-        // Update semua detail barang menjadi 'ditolak' agar tidak tampil sebagai "dipakai"
+        // Update semua detail barang menjadi 'ditolak' agar tidak tampil sebagai "dipakai" / "dipinjam"
         TransactionDetail::where('transaction_id', $transaction->id)
             ->update(['status' => 'ditolak']);
 
         return response()->json(['success' => true, 'message' => 'Transaksi ditolak.']);
     }
 
+    /**
+     * Mengambil daftar transaksi (API) yang berstatus aktif atau partial (barang sedang dipinjam).
+     * Sering digunakan untuk fitur pengembalian barang.
+     * 
+     * @return JsonResponse
+     */
     public function active(): JsonResponse
     {
         $transactions = Transaction::with(['details' => function ($q) {
