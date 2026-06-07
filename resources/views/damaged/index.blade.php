@@ -88,6 +88,10 @@
         <label class="flbl">Keterangan *</label>
         <textarea id="d-desc" class="fc w-100" rows="3" placeholder="Penyebab kerusakan..."></textarea>
       </div>
+      <div class="fgrp">
+        <label class="flbl">Foto Kerusakan <span class="pw-req-badge">Wajib</span></label>
+        <div id="pw-dmg-manual"></div>
+      </div>
       <button class="b-acc w-100" onclick="saveDmg()"><i class="bi bi-check-circle"></i> Catat Kerusakan</button>
     </div>
   </div>
@@ -130,6 +134,7 @@
 let _dmgStore = [], _dmgInvT = [], _selDmgInv = null;
 let _dmgQrScanner = null, _dmgScannerModal = null;
 
+async function initDmg(){await loadDmg();pwInit('dmg_manual','pw-dmg-manual','Foto Kerusakan',true);}
 async function loadDmg(){
   ld(true);
   try{
@@ -214,6 +219,7 @@ function showDmgDetail(idx){
       <div><div class="dg-lbl">Tanggal Dicatat</div><div class="dg-val">${fdt(d.date)}</div></div>
       <div><div class="dg-lbl">Dicatat Oleh</div><div class="dg-val">${esc(d.reported_by_name||'—')}</div></div>
       <div class="dg-full"><div class="dg-lbl">Keterangan</div><div class="dg-val" style="background:var(--bg);padding:10px 14px;border-radius:9px;line-height:1.5;">${esc(d.description||'—')}</div></div>
+      <div class="dg-full"><div class="dg-lbl">Foto Kerusakan</div>${photoThumb(d.damage_photo_url,'Foto Kerusakan')}</div>
     </div>
     ${fromTrx?`
     <div style="background:rgba(62,207,255,.07);border:1px solid rgba(62,207,255,.25);border-radius:10px;padding:14px;margin-top:4px;">
@@ -232,21 +238,26 @@ function showDmgDetail(idx){
 }
 
 async function saveDmg(){
-  const data={
-    inventory_id:document.getElementById('d-item').value,
-    qty:document.getElementById('d-qty').value,
-    description:document.getElementById('d-desc').value.trim()
-  };
-  if(!data.inventory_id){toast('Pilih barang!','warning');return;}
-  if(!data.description){toast('Keterangan wajib diisi!','warning');return;}
-  if(parseInt(data.qty)<1){toast('Jumlah minimal 1!','warning');return;}
+  const invId=document.getElementById('d-item').value;
+  const qty=document.getElementById('d-qty').value;
+  const desc=document.getElementById('d-desc').value.trim();
+  if(!invId){toast('Pilih barang!','warning');return;}
+  if(!desc){toast('Keterangan wajib diisi!','warning');return;}
+  if(parseInt(qty)<1){toast('Jumlah minimal 1!','warning');return;}
+  if(!pwValidate('dmg_manual','Foto Kerusakan'))return;
+  const fd=new FormData();
+  fd.append('inventory_id',invId);
+  fd.append('qty',qty);
+  fd.append('description',desc);
+  fd.append('damage_photo',getPhotoFile('dmg_manual'));
   ld(true);
   try{
-    const res=await api('{{ route("damaged.store") }}','POST',data);
+    const res=await apiForm('{{ route("damaged.store") }}',fd);
     ld(false);toast(res.message);
     document.getElementById('d-qty').value='1';
     document.getElementById('d-desc').value='';
     sgDmgInvClear();
+    _pwClear('dmg_manual');
     loadDmg();
   }catch(e){ld(false);toast(e.message,'danger');}
 }
@@ -300,6 +311,6 @@ document.getElementById('mdl-dmg-scanner').addEventListener('hide.bs.modal',()=>
   if(_dmgQrScanner&&_dmgQrScanner.isScanning){_dmgQrScanner.stop().catch(()=>{});_dmgQrScanner=null;}
 });
 
-loadDmg();
+initDmg();
 </script>
 @endpush

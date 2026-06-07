@@ -73,6 +73,7 @@ function sgRetSelect(id, lbl){
   loadRetItems();
 }
 function sgRetClear(){
+  (_retP||[]).forEach(d=>{_pwClear('ret_'+d.id);_pwClear('dmg_'+d.id);});
   document.getElementById('r-sel').value='';
   const txt=document.getElementById('r-sel-txt');txt.value='';txt.placeholder='Ketik nama peminjam atau ID...';
   document.getElementById('ret-sel-ui').style.display='none';
@@ -151,6 +152,8 @@ function loadRetItems(){
             </div>
           </div>
           <div class="col-12"><label class="flbl" style="font-size:11px;">Catatan <span style="color:var(--danger);">*</span></label><input type="text" class="fc fc-sm w-100" id="rn-${d.id}" placeholder="Contoh: 2 dipakai di lapangan, 1 kembali utuh..."></div>
+          <div class="col-12"><label class="flbl" style="font-size:11px;">Foto Pengembalian <span class="pw-req-badge">Wajib</span></label><div id="pw-ret-${d.id}"></div></div>
+          <div class="col-12" id="pw-dmg-wrap-${d.id}" style="display:none;"><label class="flbl" style="font-size:11px;">Foto Kerusakan <span class="pw-req-badge">Wajib</span></label><div id="pw-dmg-${d.id}"></div></div>
         </div>
       </div>`;
     }
@@ -182,17 +185,25 @@ function loadRetItems(){
           </div>
         </div>
         <div class="col-12"><label class="flbl" style="font-size:11px;">Catatan <span style="color:var(--danger);">*</span></label><input type="text" class="fc fc-sm w-100" id="rn-${d.id}" placeholder="Contoh: kembali utuh / rusak karena jatuh / hilang..."></div>
+        <div class="col-12"><label class="flbl" style="font-size:11px;">Foto Pengembalian <span class="pw-req-badge">Wajib</span></label><div id="pw-ret-${d.id}"></div></div>
+        <div class="col-12" id="pw-dmg-wrap-${d.id}" style="display:none;"><label class="flbl" style="font-size:11px;">Foto Kerusakan <span class="pw-req-badge">Wajib</span></label><div id="pw-dmg-${d.id}"></div></div>
       </div>
     </div>`;
   }).join('');
   document.getElementById('r-btn').style.display='flex';
   updateRetBtn();
+  pending.forEach(d=>{
+    pwInit('ret_'+d.id,'pw-ret-'+d.id,'Foto Pengembalian',true);
+    pwInit('dmg_'+d.id,'pw-dmg-'+d.id,'Foto Kerusakan',false);
+  });
 }
 
 async function submitRet(){
   const trx=_retT,pending=_retP||[];
   if(!trx||!pending.length){toast('Tidak ada item untuk dikembalikan.','warning');return;}
-  const items=[];
+  const fd=new FormData();
+  fd.append('transaction_id',trx.id);
+  let idx=0;
   for(const d of pending){
     const chk=document.getElementById('rc-'+d.id);
     if(!chk?.checked) continue;
@@ -201,22 +212,36 @@ async function submitRet(){
     const hilang=Math.max(0,Math.floor(parseFloat(document.getElementById('rl-'+d.id)?.value)||0));
     const nt=(document.getElementById('rn-'+d.id)?.value||'').trim();
     if(!nt){const el=document.getElementById('rn-'+d.id);el&&(el.style.borderColor='var(--danger)',el.style.background='#fef2f2',el.focus());toast(`Catatan kondisi untuk "${d.item_name}" wajib diisi.`,'warning');return;}
+    if(!pwValidate('ret_'+d.id,'Foto Pengembalian untuk '+d.item_name)) return;
+    if(rusak>0&&!pwValidate('dmg_'+d.id,'Foto Kerusakan untuk '+d.item_name)) return;
     if(d.item_type==='bon'){
       const kembali=Math.max(0,Math.floor(parseFloat(document.getElementById('rq-'+d.id)?.value)||0));
       const dipakai=Math.max(0,Math.floor(parseFloat(document.getElementById('rp-'+d.id)?.value)||0));
       const total=kembali+dipakai+rusak+hilang;
       if(total!==rem){toast(`Data BON tidak valid untuk "${d.item_name}": total (${total}) harus sama dengan sisa pinjam (${rem}).`,'warning');return;}
-      items.push({detail_id:d.id,qty_returned:kembali,qty_consumed:dipakai,qty_damaged:rusak,qty_lost:hilang,notes:nt});
+      fd.append(`items[${idx}][detail_id]`,d.id);
+      fd.append(`items[${idx}][qty_returned]`,kembali);
+      fd.append(`items[${idx}][qty_consumed]`,dipakai);
+      fd.append(`items[${idx}][qty_damaged]`,rusak);
+      fd.append(`items[${idx}][qty_lost]`,hilang);
+      fd.append(`items[${idx}][notes]`,nt);
     } else {
       const kembali=rem-rusak-hilang;
       if(kembali<0){toast(`Data tidak valid untuk "${d.item_name}": rusak+hilang melebihi sisa pinjam.`,'warning');return;}
-      items.push({detail_id:d.id,qty_returned:rem,qty_damaged:rusak,qty_lost:hilang,notes:nt});
+      fd.append(`items[${idx}][detail_id]`,d.id);
+      fd.append(`items[${idx}][qty_returned]`,rem);
+      fd.append(`items[${idx}][qty_damaged]`,rusak);
+      fd.append(`items[${idx}][qty_lost]`,hilang);
+      fd.append(`items[${idx}][notes]`,nt);
     }
+    fd.append(`items[${idx}][return_photo]`,getPhotoFile('ret_'+d.id));
+    if(rusak>0) fd.append(`items[${idx}][damage_photo]`,getPhotoFile('dmg_'+d.id));
+    idx++;
   }
-  if(!items.length){toast('Pilih minimal satu item untuk dikembalikan.','warning');return;}
+  if(!idx){toast('Pilih minimal satu item untuk dikembalikan.','warning');return;}
   ld(true);
   try{
-    const res=await api('{{ route("returns.store") }}','POST',{transaction_id:trx.id,items});
+    const res=await apiForm('{{ route("returns.store") }}',fd);
     ld(false);toast(res.message,'success');
     sgRetClear();
     const r=await api('{{ route("transactions.active") }}');
@@ -234,6 +259,7 @@ function onRetChk(id){
   } else {
     fields.style.opacity='0.35';fields.style.pointerEvents='none';
     card.style.opacity='0.55';card.style.borderColor='rgba(100,116,139,.2)';
+    _pwClear('ret_'+id);_pwClear('dmg_'+id);
   }
   updateRetBtn();
 }
@@ -267,6 +293,8 @@ function onBonFieldChange(id,rem){
   }
   if(errBox) errBox.style.display=valid?'none':'block';
   if(rqEl) rqEl.dataset.valid=valid?'1':'0';
+  const dmgWrap=document.getElementById('pw-dmg-wrap-'+id);
+  if(dmgWrap) dmgWrap.style.display=rusak>0?'block':'none';
   updateRetBtn();
 }
 
@@ -299,6 +327,8 @@ function onRetFieldChange(id,rem){
   }
   if(errBox) errBox.style.display=valid?'none':'block';
   if(rqEl) rqEl.dataset.valid=valid?'1':'0';
+  const dmgWrap=document.getElementById('pw-dmg-wrap-'+id);
+  if(dmgWrap) dmgWrap.style.display=rusak>0?'block':'none';
   updateRetBtn();
 }
 

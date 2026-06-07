@@ -17,7 +17,7 @@ class Transaction extends Model
     protected $fillable = [
         'transaction_code', 'borrower_id', 'borrower_name',
         'loan_date', 'return_date', 'status',
-        'notes', 'created_by', 'created_by_name', 'signature',
+        'notes', 'created_by', 'created_by_name', 'borrow_photo',
     ];
 
     /**

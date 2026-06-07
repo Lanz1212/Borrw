@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\DamagedItem;
 use App\Models\Inventory;
+use App\Services\PhotoService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -51,12 +52,13 @@ class DamagedController extends Controller
                     'qty'             => $d->qty,
                     'description'     => $d->description,
                     'condition_notes' => $d->condition_notes,
-                    'date'            => $d->created_at?->toISOString(),
+                    'date'             => $d->created_at?->toISOString(),
                     'reported_by_name' => $d->reported_by_name,
                     'transaction_id'   => $d->transaction_id,
                     'transaction_code' => $d->transaction?->transaction_code,
                     'borrower_name'    => $d->transaction?->borrower_name,
                     'loan_date'        => $d->transaction?->loan_date?->toISOString(),
+                    'damage_photo_url' => PhotoService::url($d->damage_photo),
                 ];
             });
 
@@ -77,6 +79,7 @@ class DamagedController extends Controller
             'inventory_id' => 'required|exists:inventory,id',
             'qty'          => 'required|integer|min:1',
             'description'  => 'required|string',
+            'damage_photo' => 'required|image|mimes:jpg,jpeg,png,webp|max:10240',
         ]);
 
         // Eksekusi DB transaction: Jika salah satu proses gagal, seluruh perubahan dibatalkan (rollback)
@@ -105,6 +108,9 @@ class DamagedController extends Controller
                 'description'      => $request->description,
                 'reported_by'      => $user->id,
                 'reported_by_name' => $user->name,
+                'damage_photo'     => $request->hasFile('damage_photo')
+                                       ? PhotoService::store($request->file('damage_photo'), 'damage-photos')
+                                       : null,
             ]);
 
             return response()->json(['success' => true, 'message' => 'Barang rusak berhasil dicatat.', 'data' => $damaged]);

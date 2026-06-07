@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Inventory;
 use App\Models\Transaction;
 use App\Models\TransactionDetail;
+use App\Services\PhotoService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -65,9 +66,9 @@ class TransactionController extends Controller
                 'loan_date'    => $t->loan_date?->toISOString(),
                 'return_date'  => $t->return_date?->toISOString(),
                 'status'       => $t->status,
-                'notes'        => $t->notes,
-                'signature'    => $t->signature,
-                'created_by_name' => $t->created_by_name,
+                'notes'            => $t->notes,
+                'borrow_photo_url' => PhotoService::url($t->borrow_photo),
+                'created_by_name'  => $t->created_by_name,
                 'details'      => $t->details->map(fn($d) => [
                     'id'           => $d->id,
                     'inventory_id' => $d->inventory_id,
@@ -81,8 +82,12 @@ class TransactionController extends Controller
                     'qty_consumed' => $d->returns->sum('qty_consumed'),
                     'qty_damaged'  => $d->returns->sum('qty_damaged'),
                     'qty_lost'     => $d->returns->sum('qty_lost'),
-                    'return_notes' => $d->returns->pluck('notes')->filter()->join('; '),
-                    'return_date'  => $d->return_date?->toISOString(),
+                    'return_notes'   => $d->returns->pluck('notes')->filter()->join('; '),
+                    'return_date'    => $d->return_date?->toISOString(),
+                    'return_photos'  => $d->returns->map(fn($r) => [
+                        'return_photo_url' => PhotoService::url($r->return_photo),
+                        'damage_photo_url' => PhotoService::url($r->damage_photo),
+                    ])->filter(fn($r) => $r['return_photo_url'])->values(),
                 ]),
             ];
         });
@@ -104,18 +109,16 @@ class TransactionController extends Controller
             'borrower_id'   => 'required|exists:borrowers,id',
             'borrower_name' => 'required|string',
             'loan_date'     => 'required|date',
-            'cart'          => 'required|array|min:1',
-            'cart.*.inventory_id' => 'required|exists:inventory,id',
-            'cart.*.qty'    => 'required|integer|min:1',
+            'cart'          => 'required|string',
             'notes'         => 'nullable|string',
-            'signature'     => 'nullable|string',
+            'borrow_photo'  => 'required|image|mimes:jpg,jpeg,png,webp|max:10240',
         ]);
 
         $isAdmin = auth()->user()->isAdmin();
 
         // Menggunakan Database Transaction untuk mencegah inkonsistensi data jika insert gagal
         return DB::transaction(function () use ($request, $isAdmin) {
-            $cart = $request->cart;
+            $cart = json_decode($request->cart, true);
 
             $allConsumable = true;
             $inventoryMap  = [];
@@ -155,7 +158,9 @@ class TransactionController extends Controller
                 'notes'            => $request->notes,
                 'created_by'       => $user->id,
                 'created_by_name'  => $user->name,
-                'signature'        => $request->signature,
+                'borrow_photo'     => $request->hasFile('borrow_photo')
+                                       ? PhotoService::store($request->file('borrow_photo'), 'borrow-photos')
+                                       : null,
             ]);
 
             // Menyimpan detail transaksi untuk masing-masing barang (cart)

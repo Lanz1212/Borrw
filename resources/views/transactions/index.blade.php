@@ -65,11 +65,8 @@
       <div id="cart-box" style="margin-bottom:12px;"></div>
 
       <div class="fgrp">
-        <label class="flbl">Tanda Tangan <small style="color:var(--muted);font-size:11px;">(gambar di kotak)</small></label>
-        <div style="width:100%;border:2px dashed var(--border);border-radius:10px;background:#fff;overflow:hidden;">
-          <canvas id="sig-cv" height="110" style="width:100%;display:block;touch-action:none;"></canvas>
-        </div>
-        <button class="b-out mt-2" style="font-size:12px;padding:6px 12px;" onclick="clrSig()"><i class="bi bi-eraser me-1"></i>Hapus TTD</button>
+        <label class="flbl">Foto Peminjam <span class="pw-req-badge">Wajib</span></label>
+        <div id="pw-borrow"></div>
       </div>
 
       <div class="fgrp">
@@ -181,7 +178,7 @@ async function initTrx(){
     renderCart();
   }catch(e){ld(false);toast(e.message,'danger');}
   document.getElementById('t-ld').value = nowLocal();
-  setTimeout(initSig, 100);
+  pwInit('borrow','pw-borrow','Foto Peminjam',true);
 }
 
 @if(auth()->user()->isAdmin())
@@ -272,13 +269,18 @@ function showTrxDetail(id){
       <div><div class="dg-lbl">Tanggal Kembali</div><div class="dg-val">${t.return_date ? fdt(t.return_date) : '<span style="color:var(--muted);font-size:12px;">Belum dikembalikan</span>'}</div></div>
       ${t.notes?`<div class="dg-full"><div class="dg-lbl">Catatan</div><div class="dg-val" style="background:var(--bg);padding:8px 12px;border-radius:8px;">${esc(t.notes)}</div></div>`:''}
     </div>
-    ${t.signature?`<div style="margin-top:16px;"><div class="dg-lbl" style="font-size:11px;font-weight:600;margin-bottom:6px;">TANDA TANGAN PEMINJAM</div><div id="sig-box" style="border:1.5px solid var(--border);border-radius:8px;padding:8px;display:inline-block;background:#fff;min-height:36px;"></div></div>`:''}
+    <div style="display:flex;gap:20px;flex-wrap:wrap;margin-top:14px;">
+      <div>
+        <div class="dg-lbl" style="font-size:11px;font-weight:600;margin-bottom:6px;">FOTO SAAT PEMINJAMAN</div>
+        ${photoThumb(t.borrow_photo_url,'Foto Peminjaman')}
+      </div>
+      ${(()=>{const rp=(t.details||[]).flatMap(d=>d.return_photos||[]);return rp.length?`<div><div class="dg-lbl" style="font-size:11px;font-weight:600;margin-bottom:6px;">FOTO SAAT PENGEMBALIAN</div><div style="display:flex;gap:8px;flex-wrap:wrap;">${rp.map(r=>r.return_photo_url?`<div style="text-align:center;">${photoThumb(r.return_photo_url,'Foto Kembali')}${r.damage_photo_url?`<div style="margin-top:4px;">${photoThumb(r.damage_photo_url,'Foto Rusak')}</div>`:''}</div>`:'').join('')}</div></div>`:`<div><div class="dg-lbl" style="font-size:11px;font-weight:600;margin-bottom:6px;">FOTO SAAT PENGEMBALIAN</div><span style="color:var(--muted);font-size:12px;font-style:italic;">Belum ada foto pengembalian</span></div>`;})()}
+    </div>
     <div style="font-weight:700;font-size:13px;margin-bottom:10px;margin-top:20px;"><i class="bi bi-box-seam text-primary"></i> Daftar Barang</div>
     <div class="tw"><table class="table">
       <thead><tr><th>Nama Barang</th><th>Kode</th><th>Jenis</th><th style="text-align:center;">Jml</th><th style="text-align:center;">Kembali</th><th style="text-align:center;">Dipakai*</th><th style="text-align:center;">Rusak</th><th style="text-align:center;">Hilang</th><th>Status</th></tr></thead>
       <tbody>${detailRows}</tbody>
     </table></div>`;
-  if(t.signature) renderSig(t.signature, document.getElementById('sig-box'));
   new bootstrap.Modal(document.getElementById('mdl-trx-detail')).show();
 }
 
@@ -368,28 +370,6 @@ function renderCart(){
 function chCart(i,d){if(!_cart[i])return;_cart[i].qty=Math.max(1,Math.min(_cart[i].av,_cart[i].qty+d));renderCart();}
 function rmCart(i){_cart.splice(i,1);renderCart();}
 
-// Signature
-function initSig(){
-  const cv=document.getElementById('sig-cv');if(!cv)return;
-  const r0=cv.getBoundingClientRect();
-  cv.width=Math.round(r0.width)||320;
-  const ctx=cv.getContext('2d');let drw=false,lx=0,ly=0;
-  function pos(e){
-    const r=cv.getBoundingClientRect();
-    const s=e.touches?e.touches[0]:e;
-    const scaleX=cv.width/r.width;
-    const scaleY=cv.height/r.height;
-    return{x:(s.clientX-r.left)*scaleX,y:(s.clientY-r.top)*scaleY};
-  }
-  function start(e){e.preventDefault();drw=true;const p=pos(e);lx=p.x;ly=p.y;}
-  function move(e){if(!drw)return;e.preventDefault();const p=pos(e);ctx.beginPath();ctx.moveTo(lx,ly);ctx.lineTo(p.x,p.y);ctx.strokeStyle='#000000';ctx.lineWidth=2;ctx.lineCap='round';ctx.stroke();lx=p.x;ly=p.y;}
-  function stop(){drw=false;}
-  cv.addEventListener('mousedown',start);cv.addEventListener('touchstart',start,{passive:false});
-  cv.addEventListener('mousemove',move);cv.addEventListener('touchmove',move,{passive:false});
-  cv.addEventListener('mouseup',stop);cv.addEventListener('touchend',stop);
-  window.addEventListener('resize',()=>{const rn=cv.getBoundingClientRect();if(rn.width>0){cv.width=Math.round(rn.width);}});
-}
-function clrSig(){const c=document.getElementById('sig-cv');if(c)c.getContext('2d').clearRect(0,0,c.width,c.height);}
 
 async function submitTrx(){
   const brwId=document.getElementById('t-brw').value;
@@ -398,19 +378,18 @@ async function submitTrx(){
   if(!brwId){toast('Pilih peminjam terlebih dahulu!','warning');return;}
   if(!loanDt){toast('Tanggal pinjam wajib diisi!','warning');return;}
   if(!_cart.length){toast('Keranjang masih kosong!','warning');return;}
+  if(!pwValidate('borrow','Foto Peminjam'))return;
   const brwNm=(_brwT.find(b=>b.id==brwId)||{}).name||'';
-  let sig='';
-  const cv=document.getElementById('sig-cv');
-  if(cv){try{const tmp=document.createElement('canvas');tmp.width=180;tmp.height=50;const tc=tmp.getContext('2d');tc.fillStyle='#ffffff';tc.fillRect(0,0,180,50);tc.drawImage(cv,0,0,180,50);sig=tmp.toDataURL('image/jpeg',0.7);}catch(e){sig='';}}
-  const txData={
-    borrower_id:parseInt(brwId),borrower_name:brwNm,
-    loan_date:loanDt,
-    notes,signature:sig,
-    cart:_cart.map(c=>({inventory_id:c.id,qty:c.qty}))
-  };
+  const fd=new FormData();
+  fd.append('borrower_id',brwId);
+  fd.append('borrower_name',brwNm);
+  fd.append('loan_date',loanDt);
+  fd.append('notes',notes);
+  fd.append('cart',JSON.stringify(_cart.map(c=>({inventory_id:c.id,qty:c.qty}))));
+  fd.append('borrow_photo',getPhotoFile('borrow'));
   ld(true);
   try{
-    const res=await api('{{ route("transactions.store") }}','POST',txData);
+    const res=await apiForm('{{ route("transactions.store") }}',fd);
     ld(false);
     const toastType = res.pending ? 'warning' : 'success';
     toast(res.pending ? `${res.transaction_code} — Menunggu persetujuan admin.` : `Transaksi ${res.transaction_code} berhasil!`, toastType);
@@ -420,7 +399,7 @@ async function submitTrx(){
     document.getElementById('t-brw-txt').placeholder='Ketik nama peminjam...';
     document.getElementById('brw-sel').style.display='none';
     document.getElementById('t-nt').value='';
-    clrSig();renderCart();
+    _pwClear('borrow');renderCart();
     const trxR=await api('{{ route("transactions.data") }}');
     _trxStore=trxR.data||[];
     const nonP=_trxStore.filter(t=>t.status!=='menunggu_persetujuan'&&t.status!=='ditolak');

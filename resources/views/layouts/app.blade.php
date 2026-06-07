@@ -124,6 +124,18 @@
     .sg-item:hover{background:#F8FAFC;}
     .sg-sel{display:flex;align-items:center;gap:8px;padding:8px 12px;background:#F0FDF4;border:1px solid #BBF7D0;border-radius:6px;font-size:13px;margin-top:6px;word-break:break-word;width:100%;}
     .sg-sel-x{margin-left:auto;background:none;border:none;cursor:pointer;color:var(--muted);padding:2px 4px;display:flex;flex-shrink:0;}
+    /* PHOTO WIDGET */
+    .pw-zone{border:2px dashed var(--border);border-radius:10px;padding:18px 14px;text-align:center;background:#FAFAFA;cursor:pointer;transition:border-color .15s,background .15s;position:relative;}
+    .pw-zone:hover{border-color:var(--accent);background:#FFF7ED;}
+    .pw-zone.has-photo{border-style:solid;border-color:#BBF7D0;background:#F0FDF4;padding:10px;}
+    .pw-preview{display:flex;align-items:flex-start;gap:10px;flex-wrap:wrap;}
+    .pw-img{width:88px;height:72px;object-fit:cover;border-radius:7px;border:1.5px solid var(--border);cursor:pointer;flex-shrink:0;}
+    .pw-btns{display:flex;flex-direction:column;gap:6px;flex:1;min-width:80px;}
+    .pw-btn-cam{background:var(--primary);color:#fff;border:none;border-radius:6px;padding:6px 10px;font-size:11.5px;font-weight:500;cursor:pointer;display:inline-flex;align-items:center;gap:5px;width:100%;}
+    .pw-btn-file{background:#fff;color:var(--primary);border:1px solid var(--border);border-radius:6px;padding:6px 10px;font-size:11.5px;font-weight:500;cursor:pointer;display:inline-flex;align-items:center;gap:5px;width:100%;}
+    .pw-btn-del{background:#FEF2F2;color:var(--danger);border:1px solid #FECACA;border-radius:6px;padding:6px 10px;font-size:11.5px;font-weight:500;cursor:pointer;display:inline-flex;align-items:center;gap:5px;width:100%;}
+    .pw-error{font-size:11.5px;color:var(--danger);margin-top:6px;display:none;}
+    .pw-req-badge{display:inline-block;background:#FEF2F2;color:var(--danger);border-radius:3px;font-size:10px;font-weight:600;padding:1px 5px;margin-left:4px;}
     .sg-sel-x:hover{color:var(--danger);}
     /* MODAL — light header */
     .modal-content{border-radius:10px;border:1px solid var(--border);box-shadow:var(--shadowL);}
@@ -383,6 +395,17 @@ async function api(url,method='GET',data=null){
     throw e;
   }
 }
+async function apiForm(url,formData){
+  try{
+    const r=await fetch(url,{method:'POST',headers:{'X-CSRF-TOKEN':CSRF,'Accept':'application/json'},body:formData});
+    const json=await r.json();
+    if(!r.ok&&!json.success){throw new Error(json.message||(json.errors?Object.values(json.errors)[0][0]:'Server error'));}
+    return json;
+  }catch(e){
+    if(e.name==='SyntaxError')return{success:false,message:'Server error'};
+    throw e;
+  }
+}
 
 function esc(v){if(v==null)return'';return String(v).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
 function fd(s){if(!s)return'—';try{return new Date(s).toLocaleDateString('id-ID',{day:'2-digit',month:'short',year:'numeric'});}catch(e){return s;}}
@@ -423,28 +446,120 @@ function exportXlsx(rows,filename){
   XLSX.writeFile(wb,filename);
 }
 function dateStr(){const d=new Date();return d.getFullYear()+String(d.getMonth()+1).padStart(2,'0')+String(d.getDate()).padStart(2,'0');}
-function renderSig(src,el){
+function photoThumb(url,label){
+  if(!url)return`<span style="color:var(--muted);font-size:12px;font-style:italic;">Belum ada foto</span>`;
+  return`<div style="display:inline-block;cursor:pointer;" onclick="photoPreview('${url}')" title="Klik untuk perbesar">
+    <img src="${url}" alt="${label||'Foto'}" style="max-width:120px;max-height:90px;object-fit:cover;border-radius:8px;border:2px solid var(--border);display:block;transition:transform .15s;" onmouseover="this.style.transform='scale(1.04)'" onmouseout="this.style.transform=''">      
+    <div style="font-size:10px;color:var(--muted);text-align:center;margin-top:3px;"><i class="bi bi-arrows-fullscreen"></i> Perbesar</div>
+  </div>`;
+}
+function photoPreview(url){
+  let ov=document.getElementById('photo-preview-ov');
+  if(!ov){
+    ov=document.createElement('div');
+    ov.id='photo-preview-ov';
+    ov.style.cssText='position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,.85);display:flex;align-items:center;justify-content:center;cursor:zoom-out;';
+    ov.onclick=()=>ov.remove();
+    document.body.appendChild(ov);
+  }
+  ov.innerHTML=`<img src="${url}" style="max-width:92vw;max-height:92vh;object-fit:contain;border-radius:10px;box-shadow:0 8px 40px rgba(0,0,0,.6);pointer-events:none;">`;
+  ov.style.display='flex';
+}
+/* ---- PHOTO WIDGET ----
+ * Renders a photo-picker zone inside `container` (DOM element or id string).
+ * Stores chosen File in `_pwFiles[key]`. Use getPhotoFile(key) to retrieve.
+ * pwInit(key, container, label, required)
+ */
+const _pwFiles={};
+function getPhotoFile(key){return _pwFiles[key]||null;}
+function pwInit(key,container,label,required){
+  const el=typeof container==='string'?document.getElementById(container):container;
   if(!el)return;
-  const img=new Image();
-  img.onload=function(){
-    const cv=document.createElement('canvas');
-    cv.width=img.width;cv.height=img.height;
-    cv.style.cssText='max-width:260px;max-height:110px;width:auto;height:auto;display:block;border-radius:4px;';
-    const ctx=cv.getContext('2d');
-    ctx.drawImage(img,0,0);
-    const d=ctx.getImageData(0,0,cv.width,cv.height);
-    const bgLum=0.2126*d.data[0]+0.7152*d.data[1]+0.0722*d.data[2];
-    const darkBg=bgLum<50;
-    for(let i=0;i<d.data.length;i+=4){
-      const lum=0.2126*d.data[i]+0.7152*d.data[i+1]+0.0722*d.data[i+2];
-      d.data[i]=d.data[i+1]=d.data[i+2]=darkBg?(lum<30?255:0):(lum>200?255:0);
-      d.data[i+3]=255;
-    }
-    ctx.putImageData(d,0,0);
-    el.innerHTML='';el.appendChild(cv);
-  };
-  img.onerror=function(){el.innerHTML=`<img src="${src}" style="max-width:260px;max-height:110px;display:block;">`;};
-  img.src=src;
+  el.innerHTML=_pwHTML(key,label,required);
+}
+function _pwHTML(key,label,required){
+  return`<div class="pw-zone" id="pw-zone-${key}" onclick="_pwZoneClick('${key}')">
+    <div id="pw-empty-${key}">
+      <i class="bi bi-camera-fill" style="font-size:26px;color:var(--accent);display:block;margin-bottom:7px;"></i>
+      <div style="font-size:13px;font-weight:600;color:var(--primary);">Ketuk untuk ambil foto</div>
+      <div style="font-size:11px;color:#94A3B8;margin-top:3px;">atau <span style="color:var(--accent);cursor:pointer;" onclick="event.stopPropagation();_pwFile('${key}')">pilih dari file</span></div>
+    </div>
+    <div id="pw-prev-${key}" class="pw-preview" style="display:none;">
+      <img id="pw-img-${key}" class="pw-img" src="" onclick="event.stopPropagation();photoPreview(this.src)">
+      <div class="pw-btns">
+        <button type="button" class="pw-btn-cam" onclick="event.stopPropagation();_pwCamera('${key}')"><i class="bi bi-camera-fill"></i> Ambil Ulang</button>
+        <button type="button" class="pw-btn-file" onclick="event.stopPropagation();_pwFile('${key}')"><i class="bi bi-folder2-open"></i> Ganti File</button>
+        <button type="button" class="pw-btn-del" onclick="event.stopPropagation();_pwClear('${key}')"><i class="bi bi-trash3"></i> Hapus</button>
+      </div>
+    </div>
+    <input type="file" id="pw-input-${key}" accept="image/jpeg,image/png,image/webp" style="display:none;" onchange="_pwOnFile('${key}',this)">
+    <input type="file" id="pw-cam-${key}" accept="image/*" capture="environment" style="display:none;" onchange="_pwOnFile('${key}',this)">
+  </div>
+  <div class="pw-error" id="pw-err-${key}">Foto wajib diisi.</div>`;
+}
+function _pwZoneClick(key){
+  if(!_pwFiles[key]) _pwCamera(key);
+}
+function _pwCamera(key){document.getElementById('pw-cam-'+key).click();}
+function _pwFile(key){document.getElementById('pw-input-'+key).click();}
+function _pwCompressImage(file,maxDim,quality){
+  return new Promise(function(resolve){
+    var reader=new FileReader();
+    reader.onload=function(e){
+      var img=new Image();
+      img.onload=function(){
+        var w=img.width,h=img.height;
+        if(w>maxDim||h>maxDim){
+          if(w>=h){h=Math.round(h*maxDim/w);w=maxDim;}
+          else{w=Math.round(w*maxDim/h);h=maxDim;}
+        }
+        var cv=document.createElement('canvas');
+        cv.width=w;cv.height=h;
+        var ctx=cv.getContext('2d');
+        ctx.drawImage(img,0,0,w,h);
+        cv.toBlob(function(blob){
+          if(blob){
+            var name=file.name.replace(/\.[^.]+$/,'.jpg');
+            resolve(new File([blob],name,{type:'image/jpeg',lastModified:Date.now()}));
+          } else {
+            resolve(file);
+          }
+        },'image/jpeg',quality);
+      };
+      img.onerror=function(){resolve(file);};
+      img.src=e.target.result;
+    };
+    reader.onerror=function(){resolve(file);};
+    reader.readAsDataURL(file);
+  });
+}
+async function _pwOnFile(key,inp){
+  if(!inp.files||!inp.files[0])return;
+  const raw=inp.files[0];
+  const file=await _pwCompressImage(raw,1280,0.78);
+  _pwFiles[key]=file;
+  const url=URL.createObjectURL(file);
+  document.getElementById('pw-img-'+key).src=url;
+  document.getElementById('pw-empty-'+key).style.display='none';
+  document.getElementById('pw-prev-'+key).style.display='flex';
+  document.getElementById('pw-zone-'+key).classList.add('has-photo');
+  document.getElementById('pw-err-'+key).style.display='none';
+  inp.value='';
+}
+function _pwClear(key){
+  delete _pwFiles[key];
+  document.getElementById('pw-input-'+key).value='';
+  document.getElementById('pw-cam-'+key).value='';
+  document.getElementById('pw-img-'+key).src='';
+  document.getElementById('pw-empty-'+key).style.display='';
+  document.getElementById('pw-prev-'+key).style.display='none';
+  document.getElementById('pw-zone-'+key).classList.remove('has-photo');
+}
+function pwValidate(key,label){
+  const err=document.getElementById('pw-err-'+key);
+  if(!_pwFiles[key]){if(err)err.style.display='block';toast((label||'Foto')+' wajib diisi!','warning');return false;}
+  if(err)err.style.display='none';
+  return true;
 }
 </script>
 <script>

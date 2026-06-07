@@ -7,6 +7,7 @@ use App\Models\Inventory;
 use App\Models\ItemReturn;
 use App\Models\Transaction;
 use App\Models\TransactionDetail;
+use App\Services\PhotoService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -37,27 +38,35 @@ class ReturnController extends Controller
     public function store(Request $request): JsonResponse
     {
         $request->validate([
-            'transaction_id'        => 'required|exists:transactions,id',
-            'items'                 => 'required|array|min:1',
-            'items.*.detail_id'     => 'required|exists:transaction_details,id',
-            'items.*.qty_returned'  => 'required|integer|min:0',
-            'items.*.qty_consumed'  => 'nullable|integer|min:0',
-            'items.*.qty_damaged'   => 'nullable|integer|min:0',
-            'items.*.qty_lost'      => 'nullable|integer|min:0',
-            'items.*.notes'         => 'nullable|string',
+            'transaction_id'           => 'required|exists:transactions,id',
+            'items'                    => 'required|array|min:1',
+            'items.*.detail_id'        => 'required|exists:transaction_details,id',
+            'items.*.qty_returned'     => 'required|integer|min:0',
+            'items.*.qty_consumed'     => 'nullable|integer|min:0',
+            'items.*.qty_damaged'      => 'nullable|integer|min:0',
+            'items.*.qty_lost'         => 'nullable|integer|min:0',
+            'items.*.notes'            => 'nullable|string',
+            'items.*.return_photo'     => 'required|image|mimes:jpg,jpeg,png,webp|max:10240',
+            'items.*.damage_photo'     => 'nullable|image|mimes:jpg,jpeg,png,webp|max:10240',
         ]);
 
         return DB::transaction(function () use ($request) {
             $user        = auth()->user();
             $transaction = Transaction::find($request->transaction_id);
 
-            foreach ($request->items as $item) {
+            foreach ($request->items as $idx => $item) {
                 // Mengunci baris detail transaksi untuk mencegah update simultan (race conditions)
                 $detail     = TransactionDetail::lockForUpdate()->find($item['detail_id']);
                 $isBon      = $detail->item_type === 'bon';
                 $qtyDamaged = (int) ($item['qty_damaged'] ?? 0);
                 $qtyLost    = (int) ($item['qty_lost'] ?? 0);
                 $rem        = $detail->qty - $detail->qty_returned;
+
+                $returnPhotoFile = $request->file("items.{$idx}.return_photo");
+                $damagePhotoFile = $request->file("items.{$idx}.damage_photo");
+
+                $returnPhotoPath = $returnPhotoFile ? PhotoService::store($returnPhotoFile, 'return-photos') : null;
+                $damagePhotoPath = ($damagePhotoFile && $qtyDamaged > 0) ? PhotoService::store($damagePhotoFile, 'damage-photos') : null;
 
                 if ($isBon) {
                     // === Alur BON: kembali + dipakai + rusak + hilang harus = sisa pinjam ===
@@ -97,6 +106,8 @@ class ReturnController extends Controller
                         'notes'                 => $item['notes'] ?? null,
                         'processed_by'          => $user->id,
                         'processed_by_name'     => $user->name,
+                        'return_photo'          => $returnPhotoPath,
+                        'damage_photo'          => $damagePhotoPath,
                     ]);
 
                     if ($detail->inventory_id) {
@@ -120,6 +131,7 @@ class ReturnController extends Controller
                                     'transaction_id'   => $transaction->id,
                                     'reported_by'      => $user->id,
                                     'reported_by_name' => $user->name,
+                                    'damage_photo'     => $damagePhotoPath,
                                 ]);
                             }
                         }
@@ -161,6 +173,8 @@ class ReturnController extends Controller
                         'notes'                 => $item['notes'] ?? null,
                         'processed_by'          => $user->id,
                         'processed_by_name'     => $user->name,
+                        'return_photo'          => $returnPhotoPath,
+                        'damage_photo'          => $damagePhotoPath,
                     ]);
 
                     if ($detail->inventory_id) {
@@ -182,6 +196,7 @@ class ReturnController extends Controller
                                     'transaction_id'   => $transaction->id,
                                     'reported_by'      => $user->id,
                                     'reported_by_name' => $user->name,
+                                    'damage_photo'     => $damagePhotoPath,
                                 ]);
                             }
                         }

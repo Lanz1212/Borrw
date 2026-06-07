@@ -16,7 +16,7 @@ class DamagedItem extends Model
      */
     protected $fillable = [
         'inventory_id', 'item_name', 'qty', 'description', 'condition_notes',
-        'transaction_id', 'reported_by', 'reported_by_name',
+        'transaction_id', 'reported_by', 'reported_by_name', 'damage_photo',
     ];
 
     /**

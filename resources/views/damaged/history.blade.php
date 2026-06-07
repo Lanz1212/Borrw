@@ -136,6 +136,7 @@ function showDmgDetail(idx){
       <div><div class="dg-lbl">Tanggal Dicatat</div><div class="dg-val">${fdt(d.date)}</div></div>
       <div><div class="dg-lbl">Dicatat Oleh</div><div class="dg-val">${esc(d.reported_by_name||'—')}</div></div>
       <div class="dg-full"><div class="dg-lbl">Keterangan</div><div class="dg-val" style="background:var(--bg);padding:10px 14px;border-radius:9px;line-height:1.6;white-space:pre-wrap;">${esc(d.description||'—')}</div></div>
+      <div class="dg-full"><div class="dg-lbl">Foto Kerusakan</div>${photoThumb(d.damage_photo_url,'Foto Kerusakan')}</div>
     </div>
     ${fromTrx?`
     <div style="background:rgba(59,130,246,.05);border:1px solid rgba(59,130,246,.2);border-radius:10px;padding:14px;margin-top:4px;">

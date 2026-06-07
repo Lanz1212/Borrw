@@ -153,13 +153,18 @@ function showDetail(idx){
       <div><div class="dg-lbl">Tanggal Kembali</div><div class="dg-val">${t.return_date ? fdt(t.return_date) : '<span style="color:var(--muted);font-size:12px;">Belum dikembalikan</span>'}</div></div>
       ${t.notes?`<div class="dg-full"><div class="dg-lbl">Catatan</div><div class="dg-val" style="background:var(--bg);padding:8px 12px;border-radius:8px;">${esc(t.notes)}</div></div>`:''}
     </div>
-    ${t.signature?`<div style="margin-top:16px;"><div class="dg-lbl" style="font-size:11px;font-weight:600;margin-bottom:6px;">TANDA TANGAN PEMINJAM</div><div id="sig-box" style="border:1.5px solid var(--border);border-radius:8px;padding:8px;display:inline-block;background:#fff;min-height:36px;"></div></div>`:''}
+    <div style="display:flex;gap:20px;flex-wrap:wrap;margin-top:14px;">
+      <div>
+        <div class="dg-lbl" style="font-size:11px;font-weight:600;margin-bottom:6px;">FOTO SAAT PEMINJAMAN</div>
+        ${photoThumb(t.borrow_photo_url,'Foto Peminjaman')}
+      </div>
+      ${(()=>{const rp=(t.details||[]).flatMap(d=>d.return_photos||[]);return rp.length?`<div><div class="dg-lbl" style="font-size:11px;font-weight:600;margin-bottom:6px;">FOTO SAAT PENGEMBALIAN</div><div style="display:flex;gap:8px;flex-wrap:wrap;">${rp.map(r=>r.return_photo_url?`<div style="text-align:center;">${photoThumb(r.return_photo_url,'Foto Kembali')}${r.damage_photo_url?`<div style="margin-top:4px;">${photoThumb(r.damage_photo_url,'Foto Rusak')}</div>`:''}</div>`:'').join('')}</div></div>`:`<div><div class="dg-lbl" style="font-size:11px;font-weight:600;margin-bottom:6px;">FOTO SAAT PENGEMBALIAN</div><span style="color:var(--muted);font-size:12px;font-style:italic;">Belum ada foto pengembalian</span></div>`;})()}
+    </div>
     <div style="font-weight:700;font-size:13px;margin-bottom:10px;margin-top:20px;"><i class="bi bi-box-seam text-primary"></i> Daftar Barang</div>
     <div class="tw"><table class="table">
       <thead><tr><th>Nama Barang</th><th>Kode</th><th>Jenis</th><th style="text-align:center;">Jml</th><th style="text-align:center;">Kembali</th><th style="text-align:center;">Dipakai*</th><th style="text-align:center;">Rusak</th><th style="text-align:center;">Hilang</th><th>Status</th></tr></thead>
       <tbody>${detailRows}</tbody>
     </table></div>`;
-  if(t.signature) renderSig(t.signature, document.getElementById('sig-box'));
   new bootstrap.Modal(document.getElementById('mdl-trx-detail')).show();
 }
 

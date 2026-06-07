@@ -20,6 +20,7 @@ class ItemReturn extends Model
         'transaction_id', 'transaction_detail_id', 'inventory_id',
         'item_name', 'qty_returned', 'qty_good', 'qty_consumed', 'qty_damaged', 'qty_lost',
         'condition', 'notes', 'processed_by', 'processed_by_name',
+        'return_photo', 'damage_photo',
     ];
 
     /**
