@@ -114,18 +114,58 @@ function loadRetItems(){
   const selHdr=`<div style="font-size:12px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;"><span style="color:var(--muted);font-weight:500;">Pilih barang yang akan dikembalikan:</span><span style="display:flex;gap:10px;"><a href="#" onclick="toggleAllRet(true);return false;" style="color:var(--accent);text-decoration:none;font-size:11.5px;font-weight:600;">Pilih Semua</a><a href="#" onclick="toggleAllRet(false);return false;" style="color:var(--muted);text-decoration:none;font-size:11.5px;">Batal Semua</a></span></div>`;
   document.getElementById('r-items').innerHTML=selHdr+pending.map(d=>{
     const rem=d.qty-(d.qty_returned||0);
+    const isBon=d.item_type==='bon';
+    const typeBadge=isBon
+      ?`<span class="bdg b-bon" style="font-size:10px;"><i class="bi bi-tag"></i> BON</span>`
+      :`<span class="bdg b-pinjam" style="font-size:10px;"><i class="bi bi-arrow-repeat"></i> Pinjam</span>`;
+    if(isBon){
+      return`<div class="card p16 mb-2" id="ri-${d.id}" style="border:1px solid var(--border);transition:opacity .15s;">
+        <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;margin-bottom:10px;margin-right:0;">
+          <input type="checkbox" class="ret-chk" id="rc-${d.id}" checked style="width:18px;height:18px;flex-shrink:0;margin-top:2px;accent-color:var(--accent);cursor:pointer;" onchange="onRetChk(${d.id})">
+          <div style="flex:1;min-width:0;">
+            <div style="font-weight:600;font-size:13px;word-break:break-word;">${esc(d.item_name)} ${typeBadge}</div>
+            <div style="font-size:11px;color:var(--muted);">${esc(d.item_code)} • Sisa pinjam: <strong>${rem}</strong> unit • <span style="color:#C2410C;">Tentukan pembagian kembali / dipakai</span></div>
+          </div>
+        </label>
+        <div id="rf-${d.id}" class="row g-2">
+          <div class="col-6 col-sm-3">
+            <label class="flbl" style="font-size:11px;">Jml Kembali <span style="color:var(--danger);">*</span></label>
+            <input type="number" class="fc fc-sm w-100" id="rq-${d.id}" min="0" max="${rem}" value="0" data-valid="0" data-rem="${rem}" data-bon="1" oninput="onBonFieldChange(${d.id},${rem})" onchange="onBonFieldChange(${d.id},${rem})">
+          </div>
+          <div class="col-6 col-sm-3">
+            <label class="flbl" style="font-size:11px;">Jml Dipakai <span style="color:var(--danger);">*</span></label>
+            <input type="number" class="fc fc-sm w-100" id="rp-${d.id}" min="0" max="${rem}" value="0" oninput="onBonFieldChange(${d.id},${rem})" onchange="onBonFieldChange(${d.id},${rem})">
+          </div>
+          <div class="col-6 col-sm-3">
+            <label class="flbl" style="font-size:11px;">Jml Rusak</label>
+            <input type="number" class="fc fc-sm w-100" id="rd-${d.id}" min="0" max="${rem}" value="0" oninput="onBonFieldChange(${d.id},${rem})" onchange="onBonFieldChange(${d.id},${rem})">
+          </div>
+          <div class="col-6 col-sm-3">
+            <label class="flbl" style="font-size:11px;">Jml Hilang</label>
+            <input type="number" class="fc fc-sm w-100" id="rl-${d.id}" min="0" max="${rem}" value="0" oninput="onBonFieldChange(${d.id},${rem})" onchange="onBonFieldChange(${d.id},${rem})">
+          </div>
+          <div class="col-12" id="rerr-${d.id}" style="display:none;">
+            <div style="background:#fef2f2;border:1px solid #fecaca;border-radius:7px;padding:7px 10px;font-size:11.5px;color:#dc2626;display:flex;align-items:center;gap:6px;">
+              <i class="bi bi-exclamation-triangle-fill" style="flex-shrink:0;"></i>
+              <span id="rerr-txt-${d.id}"></span>
+            </div>
+          </div>
+          <div class="col-12"><label class="flbl" style="font-size:11px;">Catatan <span style="color:var(--danger);">*</span></label><input type="text" class="fc fc-sm w-100" id="rn-${d.id}" placeholder="Contoh: 2 dipakai di lapangan, 1 kembali utuh..."></div>
+        </div>
+      </div>`;
+    }
     return`<div class="card p16 mb-2" id="ri-${d.id}" style="border:1px solid var(--border);transition:opacity .15s;">
       <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;margin-bottom:10px;margin-right:0;">
         <input type="checkbox" class="ret-chk" id="rc-${d.id}" checked style="width:18px;height:18px;flex-shrink:0;margin-top:2px;accent-color:var(--accent);cursor:pointer;" onchange="onRetChk(${d.id})">
         <div style="flex:1;min-width:0;">
-          <div style="font-weight:600;font-size:13px;word-break:break-word;">${esc(d.item_name)}</div>
+          <div style="font-weight:600;font-size:13px;word-break:break-word;">${esc(d.item_name)} ${typeBadge}</div>
           <div style="font-size:11px;color:var(--muted);">${esc(d.item_code)} • Sisa pinjam: ${rem} unit</div>
         </div>
       </label>
       <div id="rf-${d.id}" class="row g-2">
         <div class="col-12 col-sm-4">
           <label class="flbl" style="font-size:11px;">Jml Kembali <span style="font-size:10px;color:var(--muted);font-weight:400;">(otomatis)</span></label>
-          <input type="number" class="fc fc-sm w-100" id="rq-${d.id}" readonly value="${rem}" data-valid="1" data-rem="${rem}" style="background:#f0fdf4;color:#166534;font-weight:700;cursor:default;border-color:#bbf7d0;">
+          <input type="number" class="fc fc-sm w-100" id="rq-${d.id}" readonly value="${rem}" data-valid="1" data-rem="${rem}" data-bon="0" style="background:#f0fdf4;color:#166534;font-weight:700;cursor:default;border-color:#bbf7d0;">
         </div>
         <div class="col-6 col-sm-4">
           <label class="flbl" style="font-size:11px;">Jml Rusak</label>
@@ -159,11 +199,19 @@ async function submitRet(){
     const rem=d.qty-(d.qty_returned||0);
     const rusak=Math.max(0,Math.floor(parseFloat(document.getElementById('rd-'+d.id)?.value)||0));
     const hilang=Math.max(0,Math.floor(parseFloat(document.getElementById('rl-'+d.id)?.value)||0));
-    const kembali=rem-rusak-hilang;
     const nt=(document.getElementById('rn-'+d.id)?.value||'').trim();
-    if(kembali<0){toast(`Data tidak valid untuk "${d.item_name}": rusak+hilang melebihi sisa pinjam.`,'warning');return;}
     if(!nt){const el=document.getElementById('rn-'+d.id);el&&(el.style.borderColor='var(--danger)',el.style.background='#fef2f2',el.focus());toast(`Catatan kondisi untuk "${d.item_name}" wajib diisi.`,'warning');return;}
-    items.push({detail_id:d.id,qty_returned:rem,qty_damaged:rusak,qty_lost:hilang,notes:nt});
+    if(d.item_type==='bon'){
+      const kembali=Math.max(0,Math.floor(parseFloat(document.getElementById('rq-'+d.id)?.value)||0));
+      const dipakai=Math.max(0,Math.floor(parseFloat(document.getElementById('rp-'+d.id)?.value)||0));
+      const total=kembali+dipakai+rusak+hilang;
+      if(total!==rem){toast(`Data BON tidak valid untuk "${d.item_name}": total (${total}) harus sama dengan sisa pinjam (${rem}).`,'warning');return;}
+      items.push({detail_id:d.id,qty_returned:kembali,qty_consumed:dipakai,qty_damaged:rusak,qty_lost:hilang,notes:nt});
+    } else {
+      const kembali=rem-rusak-hilang;
+      if(kembali<0){toast(`Data tidak valid untuk "${d.item_name}": rusak+hilang melebihi sisa pinjam.`,'warning');return;}
+      items.push({detail_id:d.id,qty_returned:rem,qty_damaged:rusak,qty_lost:hilang,notes:nt});
+    }
   }
   if(!items.length){toast('Pilih minimal satu item untuk dikembalikan.','warning');return;}
   ld(true);
@@ -187,6 +235,38 @@ function onRetChk(id){
     fields.style.opacity='0.35';fields.style.pointerEvents='none';
     card.style.opacity='0.55';card.style.borderColor='rgba(100,116,139,.2)';
   }
+  updateRetBtn();
+}
+
+function onBonFieldChange(id,rem){
+  const rqEl=document.getElementById('rq-'+id);
+  const rpEl=document.getElementById('rp-'+id);
+  const rdEl=document.getElementById('rd-'+id);
+  const rlEl=document.getElementById('rl-'+id);
+  const errBox=document.getElementById('rerr-'+id);
+  const errTxt=document.getElementById('rerr-txt-'+id);
+  let kembali=Math.max(0,Math.floor(parseFloat(rqEl.value)||0));
+  let dipakai=Math.max(0,Math.floor(parseFloat(rpEl.value)||0));
+  let rusak=Math.max(0,Math.floor(parseFloat(rdEl.value)||0));
+  let hilang=Math.max(0,Math.floor(parseFloat(rlEl.value)||0));
+  if(rqEl.value!==''&&String(rqEl.value)!==String(kembali)) rqEl.value=kembali;
+  if(rpEl.value!==''&&String(rpEl.value)!==String(dipakai)) rpEl.value=dipakai;
+  if(rdEl.value!==''&&String(rdEl.value)!==String(rusak)) rdEl.value=rusak;
+  if(rlEl.value!==''&&String(rlEl.value)!==String(hilang)) rlEl.value=hilang;
+  const total=kembali+dipakai+rusak+hilang;
+  let valid=total===rem;
+  // Reset border styles
+  [rqEl,rpEl,rdEl,rlEl].forEach(el=>{el.style.borderColor='';el.style.background='';});
+  if(!valid){
+    const diff=rem-total;
+    const msg=diff>0
+      ?`Total (${total}) kurang ${diff} dari sisa pinjam (${rem}).`
+      :`Total (${total}) melebihi sisa pinjam (${rem}) sebanyak ${-diff} unit.`;
+    if(errTxt) errTxt.textContent=msg;
+    [rqEl,rpEl,rdEl,rlEl].forEach(el=>{el.style.borderColor='var(--danger)';el.style.background='#fef2f2';});
+  }
+  if(errBox) errBox.style.display=valid?'none':'block';
+  if(rqEl) rqEl.dataset.valid=valid?'1':'0';
   updateRetBtn();
 }
 

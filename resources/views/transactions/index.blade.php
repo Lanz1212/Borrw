@@ -241,18 +241,26 @@ function showTrxDetail(id){
   const t = _trxStore.find(x=>x.id===id); if(!t) return;
   const detailRows = (t.details||[]).map(d=>{
     const ret=d.qty_returned>0;
-    const good=d.qty_good??0, dmg=d.qty_damaged??0, lost=d.qty_lost??0;
+    const isBon=d.item_type==='bon';
+    const isConsumable=d.item_type==='consumable';
+    const good=d.qty_good??0, cons=d.qty_consumed??0, dmg=d.qty_damaged??0, lost=d.qty_lost??0;
+    const typeBadge=isBon
+      ?`<span class="bdg b-bon"><i class="bi bi-tag"></i> BON</span>`
+      :(d.item_type==='pinjam'?`<span class="bdg b-pinjam"><i class="bi bi-arrow-repeat"></i> Pinjam</span>`:`<span class="bdg b-consumable"><i class="bi bi-fire"></i> Consumable</span>`);
+    const dipakaiVal=isConsumable?d.qty:(isBon?(ret?cons:'—'):'—');
+    const dipakaiClr=isConsumable?'#C2410C':(cons>0?'#C2410C':'var(--muted)');
     return `<tr>
     <td style="font-weight:500;white-space:normal;min-width:140px;">${esc(d.item_name)}</td>
     <td><code style="font-size:10px;">${esc(d.item_code)}</code></td>
-    <td><span class="bdg ${d.item_type==='pinjam'?'b-pinjam':'b-consumable'}"><i class="${d.item_type==='pinjam'?'bi bi-arrow-repeat':'bi bi-fire'}"></i> ${d.item_type==='pinjam'?'Pinjam':'Consumable'}</span></td>
+    <td>${typeBadge}</td>
     <td style="text-align:center;">${d.qty}</td>
     <td style="text-align:center;font-weight:600;color:var(--success);">${ret?good:'—'}</td>
+    <td style="text-align:center;font-weight:700;color:${dipakaiClr};">${dipakaiVal}</td>
     <td style="text-align:center;font-weight:${dmg>0?'700':'400'};color:${dmg>0?'var(--danger)':'var(--muted)'}">${ret?dmg:'—'}</td>
     <td style="text-align:center;font-weight:${lost>0?'700':'400'};color:${lost>0?'var(--danger)':'var(--muted)'}">${ret?lost:'—'}</td>
     <td><span class="bdg b-${esc(d.status)}">${esc(statusLabel(d.status))}</span></td>
-  </tr>${d.return_notes?`<tr><td colspan="8" style="padding:3px 12px 8px;background:rgba(249,115,22,.04);"><div style="font-size:11.5px;color:var(--muted);display:flex;align-items:flex-start;gap:5px;"><i class="bi bi-chat-left-text-fill" style="color:var(--accent);flex-shrink:0;margin-top:2px;"></i><span>${esc(d.return_notes)}</span></div></td></tr>`:''}`;
-  }).join('') || `<tr><td colspan="8" class="text-center" style="color:var(--muted);padding:16px;">Tidak ada item</td></tr>`;
+  </tr>${d.return_notes?`<tr><td colspan="9" style="padding:3px 12px 8px;background:rgba(249,115,22,.04);"><div style="font-size:11.5px;color:var(--muted);display:flex;align-items:flex-start;gap:5px;"><i class="bi bi-chat-left-text-fill" style="color:var(--accent);flex-shrink:0;margin-top:2px;"></i><span>${esc(d.return_notes)}</span></div></td></tr>`:''}`;
+  }).join('') || `<tr><td colspan="9" class="text-center" style="color:var(--muted);padding:16px;">Tidak ada item</td></tr>`;
 
   document.getElementById('mdl-trx-body').innerHTML = `
     <div class="detail-grid">
@@ -267,7 +275,7 @@ function showTrxDetail(id){
     ${t.signature?`<div style="margin-top:16px;"><div class="dg-lbl" style="font-size:11px;font-weight:600;margin-bottom:6px;">TANDA TANGAN PEMINJAM</div><div id="sig-box" style="border:1.5px solid var(--border);border-radius:8px;padding:8px;display:inline-block;background:#fff;min-height:36px;"></div></div>`:''}
     <div style="font-weight:700;font-size:13px;margin-bottom:10px;margin-top:20px;"><i class="bi bi-box-seam text-primary"></i> Daftar Barang</div>
     <div class="tw"><table class="table">
-      <thead><tr><th>Nama Barang</th><th>Kode</th><th>Jenis</th><th style="text-align:center;">Jml</th><th style="text-align:center;">Baik</th><th style="text-align:center;">Rusak</th><th style="text-align:center;">Hilang</th><th>Status</th></tr></thead>
+      <thead><tr><th>Nama Barang</th><th>Kode</th><th>Jenis</th><th style="text-align:center;">Jml</th><th style="text-align:center;">Kembali</th><th style="text-align:center;">Dipakai*</th><th style="text-align:center;">Rusak</th><th style="text-align:center;">Hilang</th><th>Status</th></tr></thead>
       <tbody>${detailRows}</tbody>
     </table></div>`;
   if(t.signature) renderSig(t.signature, document.getElementById('sig-box'));
@@ -308,7 +316,7 @@ function sgInvInput(q){
   if(!f.length){dd.innerHTML=`<div class="sg-item text-muted" style="cursor:default;">Barang tidak ditemukan</div>`;dd.style.display='block';return;}
   dd.innerHTML=f.slice(0,10).map(i=>`<div class="sg-item" onmousedown="sgInvSelect(${i.id},'${esc(i.name)}','${esc(i.code)}','${esc(i.type)}',${i.available_qty})">
     <div style="font-weight:500;">${esc(i.code)} — ${esc(i.name)}</div>
-    <div style="font-size:11px;margin-top:2px;display:flex;align-items:center;gap:6px;"><span class="bdg ${i.type==='pinjam'?'b-pinjam':'b-consumable'}" style="font-size:10px;">${i.type==='pinjam'?'Pinjam':'Consumable'}</span><span style="color:var(--muted);">Stok: ${i.available_qty}</span></div>
+    <div style="font-size:11px;margin-top:2px;display:flex;align-items:center;gap:6px;"><span class="bdg ${i.type==='pinjam'?'b-pinjam':i.type==='bon'?'b-bon':'b-consumable'}" style="font-size:10px;">${i.type==='pinjam'?'Pinjam':i.type==='bon'?'BON':'Consumable'}</span><span style="color:var(--muted);">Stok: ${i.available_qty}</span></div>
   </div>`).join('');
   dd.style.display='block';
 }
@@ -317,7 +325,7 @@ function sgInvSelect(id,name,code,type,av){
   const txt=document.getElementById('t-inv-txt');txt.value='';txt.placeholder=code+' — '+name;
   document.getElementById('inv-dd').style.display='none';
   document.getElementById('inv-sel-nm').textContent=code+' — '+name;
-  document.getElementById('inv-sel-info').innerHTML=`<i class="${type==='pinjam'?'bi bi-arrow-repeat text-info':'bi bi-fire text-danger'}"></i> `+(type==='pinjam'?'Pinjam':'Consumable')+' | Stok: '+av;
+  document.getElementById('inv-sel-info').innerHTML=`<i class="${type==='pinjam'?'bi bi-arrow-repeat text-info':type==='bon'?'bi bi-tag':'bi bi-fire text-danger'}"></i> `+(type==='pinjam'?'Pinjam':type==='bon'?'BON':'Consumable')+' | Stok: '+av;
   document.getElementById('inv-sel').style.display='flex';
 }
 function sgInvClear(){
@@ -344,10 +352,10 @@ function renderCart(){
   if(!_cart.length){box.innerHTML=`<div class="empty border rounded" style="padding:14px;background:var(--bg);border-style:dashed!important;"><i class="bi bi-cart3 fs-4 text-muted mb-2 d-block"></i><p class="mb-0">Keranjang kosong</p></div>`;return;}
   box.innerHTML=_cart.map((item,idx)=>`
     <div class="cart-item">
-      <div class="c-dot" style="background:${item.type==='pinjam'?'var(--info)':'var(--accent)'};"></div>
+      <div class="c-dot" style="background:${item.type==='pinjam'?'var(--info)':item.type==='bon'?'#C2410C':'var(--accent)'};"></div>
       <div class="c-info">
         <div style="font-size:13px;font-weight:500;word-break:break-word;">${esc(item.name)}</div>
-        <div style="font-size:11px;color:var(--muted);">${esc(item.code)} • <i class="${item.type==='pinjam'?'bi bi-arrow-repeat text-info':'bi bi-fire text-danger'}"></i> ${item.type==='pinjam'?'Pinjam':'Consumable'}</div>
+        <div style="font-size:11px;color:var(--muted);">${esc(item.code)} • <i class="${item.type==='pinjam'?'bi bi-arrow-repeat text-info':item.type==='bon'?'bi bi-tag':'bi bi-fire text-danger'}"></i> ${item.type==='pinjam'?'Pinjam':item.type==='bon'?'BON':'Consumable'}</div>
       </div>
       <div class="c-ctrl">
         <button class="c-btn" onclick="chCart(${idx},-1)">−</button>

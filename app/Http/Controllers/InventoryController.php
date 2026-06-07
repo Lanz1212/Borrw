@@ -66,7 +66,7 @@ class InventoryController extends Controller
             'code'          => 'required|string|unique:inventory,code',
             'name'          => 'required|string',
             'category'      => 'required|string',
-            'type'          => 'required|in:pinjam,consumable',
+            'type'          => 'required|in:pinjam,consumable,bon',
             'total_qty'     => 'required|integer|min:0',
             'available_qty' => 'required|integer|min:0',
             'min_stock'     => 'nullable|integer|min:0',
@@ -110,7 +110,7 @@ class InventoryController extends Controller
             'code'          => 'required|string|unique:inventory,code,' . $inventory->id,
             'name'          => 'required|string',
             'category'      => 'required|string',
-            'type'          => 'required|in:pinjam,consumable',
+            'type'          => 'required|in:pinjam,consumable,bon',
             'total_qty'     => 'required|integer|min:0',
             'available_qty' => 'required|integer|min:0',
             'min_stock'     => 'nullable|integer|min:0',
@@ -164,7 +164,7 @@ class InventoryController extends Controller
             if (!$code || !$name) { $skipped++; continue; }
 
             // Sanitasi input dengan memberikan nilai default sesuai enum pada DB
-            $type      = in_array($row['type'] ?? '', ['pinjam', 'consumable']) ? $row['type'] : 'pinjam';
+            $type      = in_array($row['type'] ?? '', ['pinjam', 'consumable', 'bon']) ? $row['type'] : 'pinjam';
             $condition = in_array($row['condition'] ?? '', ['baik', 'rusak', 'perlu_perbaikan']) ? $row['condition'] : 'baik';
             $totalQty  = max(0, (int)($row['total_qty'] ?? 0));
             $minStock  = max(0, (int)($row['min_stock'] ?? 0));

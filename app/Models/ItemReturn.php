@@ -18,7 +18,7 @@ class ItemReturn extends Model
      */
     protected $fillable = [
         'transaction_id', 'transaction_detail_id', 'inventory_id',
-        'item_name', 'qty_returned', 'qty_good', 'qty_damaged', 'qty_lost',
+        'item_name', 'qty_returned', 'qty_good', 'qty_consumed', 'qty_damaged', 'qty_lost',
         'condition', 'notes', 'processed_by', 'processed_by_name',
     ];
 
@@ -26,10 +26,11 @@ class ItemReturn extends Model
      * Casting nilai kuantitas menjadi integer.
      */
     protected $casts = [
-        'qty_returned' => 'integer',
-        'qty_good'     => 'integer',
-        'qty_damaged'  => 'integer',
-        'qty_lost'     => 'integer',
+        'qty_returned'  => 'integer',
+        'qty_good'      => 'integer',
+        'qty_consumed'  => 'integer',
+        'qty_damaged'   => 'integer',
+        'qty_lost'      => 'integer',
     ];
 
     /**

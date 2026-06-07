@@ -122,18 +122,26 @@ function showDetail(idx){
   const t = _histFiltered[idx]; if(!t) return;
   const detailRows = (t.details||[]).map(d=>{
     const ret=d.qty_returned>0;
-    const good=d.qty_good??0, dmg=d.qty_damaged??0, lost=d.qty_lost??0;
+    const isBon=d.item_type==='bon';
+    const isConsumable=d.item_type==='consumable';
+    const good=d.qty_good??0, cons=d.qty_consumed??0, dmg=d.qty_damaged??0, lost=d.qty_lost??0;
+    const typeBadge=isBon
+      ?`<span class="bdg b-bon"><i class="bi bi-tag"></i> BON</span>`
+      :(d.item_type==='pinjam'?`<span class="bdg b-pinjam"><i class="bi bi-arrow-repeat"></i> Pinjam</span>`:`<span class="bdg b-consumable"><i class="bi bi-fire"></i> Consumable</span>`);
+    const dipakaiVal=isConsumable?d.qty:(isBon?(ret?cons:'—'):'—');
+    const dipakaiClr=isConsumable?'#C2410C':(cons>0?'#C2410C':'var(--muted)');
     return `<tr>
     <td style="font-weight:500;white-space:normal;min-width:140px;">${esc(d.item_name)}</td>
     <td><code style="font-size:10px;">${esc(d.item_code)}</code></td>
-    <td><span class="bdg ${d.item_type==='pinjam'?'b-pinjam':'b-consumable'}"><i class="${d.item_type==='pinjam'?'bi bi-arrow-repeat':'bi bi-fire'}"></i> ${d.item_type==='pinjam'?'Pinjam':'Consumable'}</span></td>
+    <td>${typeBadge}</td>
     <td style="text-align:center;">${d.qty}</td>
     <td style="text-align:center;font-weight:600;color:var(--success);">${ret?good:'—'}</td>
+    <td style="text-align:center;font-weight:700;color:${dipakaiClr};">${dipakaiVal}</td>
     <td style="text-align:center;font-weight:${dmg>0?'700':'400'};color:${dmg>0?'var(--danger)':'var(--muted)'}">${ret?dmg:'—'}</td>
     <td style="text-align:center;font-weight:${lost>0?'700':'400'};color:${lost>0?'var(--danger)':'var(--muted)'}">${ret?lost:'—'}</td>
     <td><span class="bdg b-${esc(d.status)}">${esc(statusLabel(d.status))}</span></td>
-  </tr>${d.return_notes?`<tr><td colspan="8" style="padding:3px 12px 8px;background:rgba(249,115,22,.04);"><div style="font-size:11.5px;color:var(--muted);display:flex;align-items:flex-start;gap:5px;"><i class="bi bi-chat-left-text-fill" style="color:var(--accent);flex-shrink:0;margin-top:2px;"></i><span>${esc(d.return_notes)}</span></div></td></tr>`:''}`;
-  }).join('') || `<tr><td colspan="8" class="text-center" style="color:var(--muted);padding:16px;">Tidak ada item</td></tr>`;
+  </tr>${d.return_notes?`<tr><td colspan="9" style="padding:3px 12px 8px;background:rgba(249,115,22,.04);"><div style="font-size:11.5px;color:var(--muted);display:flex;align-items:flex-start;gap:5px;"><i class="bi bi-chat-left-text-fill" style="color:var(--accent);flex-shrink:0;margin-top:2px;"></i><span>${esc(d.return_notes)}</span></div></td></tr>`:''}`;
+  }).join('') || `<tr><td colspan="9" class="text-center" style="color:var(--muted);padding:16px;">Tidak ada item</td></tr>`;
 
   document.getElementById('mdl-trx-body').innerHTML = `
     <div class="detail-grid">
@@ -148,7 +156,7 @@ function showDetail(idx){
     ${t.signature?`<div style="margin-top:16px;"><div class="dg-lbl" style="font-size:11px;font-weight:600;margin-bottom:6px;">TANDA TANGAN PEMINJAM</div><div id="sig-box" style="border:1.5px solid var(--border);border-radius:8px;padding:8px;display:inline-block;background:#fff;min-height:36px;"></div></div>`:''}
     <div style="font-weight:700;font-size:13px;margin-bottom:10px;margin-top:20px;"><i class="bi bi-box-seam text-primary"></i> Daftar Barang</div>
     <div class="tw"><table class="table">
-      <thead><tr><th>Nama Barang</th><th>Kode</th><th>Jenis</th><th style="text-align:center;">Jml</th><th style="text-align:center;">Baik</th><th style="text-align:center;">Rusak</th><th style="text-align:center;">Hilang</th><th>Status</th></tr></thead>
+      <thead><tr><th>Nama Barang</th><th>Kode</th><th>Jenis</th><th style="text-align:center;">Jml</th><th style="text-align:center;">Kembali</th><th style="text-align:center;">Dipakai*</th><th style="text-align:center;">Rusak</th><th style="text-align:center;">Hilang</th><th>Status</th></tr></thead>
       <tbody>${detailRows}</tbody>
     </table></div>`;
   if(t.signature) renderSig(t.signature, document.getElementById('sig-box'));
@@ -167,8 +175,9 @@ function exportHistory(){
       'Nama Barang',
       'Jenis',
       'Jumlah Pinjam',
-      'Kondisi Baik',
-      'Kondisi Rusak',
+      'Kembali',
+      'Dipakai (BON)',
+      'Rusak',
       'Hilang',
       'Status Barang',
       'Tanggal Kembali',
@@ -202,9 +211,10 @@ function exportHistory(){
           t.loan_date ? new Date(t.loan_date).toLocaleDateString('id-ID') : '',
           d.item_code                 || '',
           d.item_name                 || '',
-          d.item_type === 'pinjam' ? 'Pinjam' : 'Consumable',
+          d.item_type === 'pinjam' ? 'Pinjam' : d.item_type === 'bon' ? 'BON' : 'Consumable',
           d.qty,
           returned ? (d.qty_good  ?? 0) : '',
+          d.item_type === 'bon' ? (returned ? (d.qty_consumed ?? 0) : '') : '',
           returned ? (d.qty_damaged ?? 0) : '',
           returned ? (d.qty_lost  ?? 0) : '',
           statusLabel(d.status),

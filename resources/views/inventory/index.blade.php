@@ -10,6 +10,7 @@
       <option value="">Semua Jenis</option>
       <option value="pinjam">Pinjam</option>
       <option value="consumable">Consumable</option>
+      <option value="bon">BON</option>
     </select>
   </div>
   <div class="d-flex gap-2 flex-wrap">
@@ -51,6 +52,7 @@
             <select id="inv-type" class="fs">
               <option value="pinjam">Barang Pinjam (returnable)</option>
               <option value="consumable">Consumable (habis pakai)</option>
+              <option value="bon">BON (status ditentukan saat kembali)</option>
             </select>
           </div>
           <div class="col-12 col-md-4"><label class="flbl">Jumlah Total *</label><input type="number" id="inv-tot" class="fc" min="0" value="0"></div>
@@ -89,7 +91,7 @@
             <li>Format file: <strong>.xlsx</strong> atau <strong>.csv</strong></li>
             <li>Kolom wajib: <strong>Kode</strong> dan <strong>Nama Barang</strong></li>
             <li>Jika kode sudah ada → <strong>diperbarui</strong>. Belum ada → <strong>ditambahkan baru</strong>.</li>
-            <li>Tipe valid: <code>pinjam</code> atau <code>consumable</code> &nbsp;|&nbsp; Kondisi: <code>baik</code>, <code>rusak</code>, <code>perlu_perbaikan</code></li>
+            <li>Tipe valid: <code>pinjam</code>, <code>consumable</code>, atau <code>bon</code> &nbsp;|&nbsp; Kondisi: <code>baik</code>, <code>rusak</code>, <code>perlu_perbaikan</code></li>
           </ul>
         </div>
         <button class="b-out mb-3" style="font-size:12.5px;padding:7px 14px;" onclick="downloadTemplate()"><i class="bi bi-download me-1"></i> Download Template Excel</button>
@@ -151,7 +153,7 @@ function renderInvRows(items){
       <td><code style="font-size:11px;">${esc(i.code)}</code></td>
       <td><div style="font-weight:500;">${esc(i.name)}</div>${lo?'<span class="low-pill mt-1"><i class="bi bi-exclamation-triangle"></i> Menipis</span>':''}</td>
       <td><span class="bdg b-cat">${esc(i.category)}</span></td>
-      <td><span class="bdg ${i.type==='pinjam'?'b-pinjam':'b-consumable'}"><i class="${i.type==='pinjam'?'bi bi-arrow-repeat':'bi bi-fire'}"></i> ${i.type==='pinjam'?'Pinjam':'Consumable'}</span></td>
+      <td><span class="bdg ${i.type==='pinjam'?'b-pinjam':i.type==='bon'?'b-bon':'b-consumable'}"><i class="${i.type==='pinjam'?'bi bi-arrow-repeat':i.type==='bon'?'bi bi-tag':'bi bi-fire'}"></i> ${i.type==='pinjam'?'Pinjam':i.type==='bon'?'BON':'Consumable'}</span></td>
       <td style="text-align:center;">${i.total_qty}</td>
       <td style="text-align:center;"><strong style="color:${lo?'var(--warning)':'var(--success)'};">${i.available_qty}</strong></td>
       <td style="text-align:center;">${i.min_stock}</td>
@@ -236,6 +238,7 @@ function downloadTemplate(){
     ['Kode','Nama Barang','Kategori','Tipe','Total Qty','Tersedia','Min Stok','Kondisi','Catatan'],
     ['BRG-XXX','Contoh Barang','Mekanik','pinjam',10,10,3,'baik','Opsional'],
     ['KBL-XXX','Contoh Consumable','Elektrik','consumable',50,50,10,'baik',''],
+    ['BON-XXX','Contoh BON','Mekanik','bon',20,20,5,'baik',''],
   ];
   exportXlsx(rows,'Template_Import_Inventaris.xlsx');
 }
@@ -279,7 +282,7 @@ function handleImportFile(input){
         <tr>
           <td><code style="font-size:11px;">${esc(r.code)}</code></td>
           <td>${esc(r.name)}</td><td>${esc(r.category)}</td>
-          <td><span class="bdg ${r.type==='pinjam'?'b-pinjam':'b-consumable'}">${r.type}</span></td>
+          <td><span class="bdg ${r.type==='pinjam'?'b-pinjam':r.type==='bon'?'b-bon':'b-consumable'}">${r.type}</span></td>
           <td style="text-align:center;">${r.total_qty}</td>
           <td style="text-align:center;">${r.available_qty ?? r.total_qty}</td>
           <td style="text-align:center;">${r.min_stock}</td>

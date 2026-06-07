@@ -83,6 +83,7 @@
     .bdg{display:inline-flex;align-items:center;padding:3px 7px;border-radius:4px;font-size:11px;font-weight:500;white-space:nowrap;}
     .b-pinjam{background:#EFF6FF;color:#1D4ED8;}
     .b-consumable{background:#FFFBEB;color:#92400E;}
+    .b-bon{background:#FFF7ED;color:#C2410C;}
     .b-aktif{background:#F0FDF4;color:#15803D;}
     .b-selesai{background:#F1F5F9;color:#475569;}
     .b-dipakai,.b-diambil{background:#F1F5F9;color:#475569;}

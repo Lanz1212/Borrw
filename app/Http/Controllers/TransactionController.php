@@ -78,6 +78,7 @@ class TransactionController extends Controller
                     'status'       => $d->status,
                     'qty_returned' => $d->qty_returned,
                     'qty_good'     => $d->returns->sum('qty_good'),
+                    'qty_consumed' => $d->returns->sum('qty_consumed'),
                     'qty_damaged'  => $d->returns->sum('qty_damaged'),
                     'qty_lost'     => $d->returns->sum('qty_lost'),
                     'return_notes' => $d->returns->pluck('notes')->filter()->join('; '),
@@ -129,7 +130,7 @@ class TransactionController extends Controller
                 if ($inv->available_qty < $cartItem['qty']) {
                     return response()->json(['success' => false, 'message' => "Stok \"{$inv->name}\" tidak mencukupi. Tersedia: {$inv->available_qty}"], 422);
                 }
-                if ($inv->type === 'pinjam') {
+                if ($inv->type === 'pinjam' || $inv->type === 'bon') {
                     $allConsumable = false;
                 }
                 $inventoryMap[$inv->id] = $inv;
@@ -160,7 +161,7 @@ class TransactionController extends Controller
             // Menyimpan detail transaksi untuk masing-masing barang (cart)
             foreach ($cart as $cartItem) {
                 $inv          = $inventoryMap[$cartItem['inventory_id']];
-                $detailStatus = $inv->type === 'pinjam' ? 'dipinjam' : 'dipakai';
+                $detailStatus = ($inv->type === 'pinjam' || $inv->type === 'bon') ? 'dipinjam' : 'dipakai';
 
                 TransactionDetail::create([
                     'transaction_id' => $transaction->id,
@@ -248,7 +249,7 @@ class TransactionController extends Controller
                     return response()->json(['success' => false,
                         'message' => "Stok \"{$inv->name}\" tidak mencukupi. Tersedia: {$inv->available_qty}"], 422);
                 }
-                if ($inv->type === 'pinjam') {
+                if ($inv->type === 'pinjam' || $inv->type === 'bon') {
                     $allConsumable = false;
                 }
             }
@@ -301,11 +302,11 @@ class TransactionController extends Controller
     public function active(): JsonResponse
     {
         $transactions = Transaction::with(['details' => function ($q) {
-            $q->where('item_type', 'pinjam')->where('status', 'dipinjam');
+            $q->whereIn('item_type', ['pinjam', 'bon'])->where('status', 'dipinjam');
         }])
         ->whereIn('status', ['aktif', 'partial'])
         ->whereHas('details', function ($q) {
-            $q->where('item_type', 'pinjam')->where('status', 'dipinjam');
+            $q->whereIn('item_type', ['pinjam', 'bon'])->where('status', 'dipinjam');
         })
         ->orderByDesc('created_at')
         ->get()

@@ -17,6 +17,7 @@
     .badge{display:inline-block;padding:2px 7px;border-radius:20px;font-size:9px;font-weight:600;margin-top:3px;}
     .badge-pinjam{background:rgba(59,130,246,.12);color:#1D4ED8;}
     .badge-consumable{background:rgba(245,158,11,.12);color:#92400E;}
+    .badge-bon{background:rgba(194,65,12,.1);color:#C2410C;}
     .print-btn{position:fixed;bottom:20px;right:20px;background:#1E293B;color:#fff;border:none;padding:10px 20px;border-radius:8px;cursor:pointer;font-size:13px;font-weight:600;display:flex;align-items:center;gap:6px;box-shadow:0 4px 12px rgba(0,0,0,.2);}
     .print-btn:hover{background:#334155;}
     @media print{
@@ -38,8 +39,8 @@
   <div class="item-code">{{ $inventory->code }}</div>
   <div class="item-meta">
     {{ $inventory->category }}<br>
-    <span class="badge {{ $inventory->type === 'pinjam' ? 'badge-pinjam' : 'badge-consumable' }}">
-      {{ $inventory->type === 'pinjam' ? 'Pinjam' : 'Consumable' }}
+    <span class="badge {{ $inventory->type === 'pinjam' ? 'badge-pinjam' : ($inventory->type === 'bon' ? 'badge-bon' : 'badge-consumable') }}">
+      {{ $inventory->type === 'pinjam' ? 'Pinjam' : ($inventory->type === 'bon' ? 'BON' : 'Consumable') }}
     </span>
   </div>
 </div>

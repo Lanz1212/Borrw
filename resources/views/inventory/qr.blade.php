@@ -37,9 +37,9 @@
     <div class="qr-item-code">{{ $inventory->code }}</div>
     <div class="qr-meta">
       <span class="bdg b-cat">{{ $inventory->category }}</span>
-      <span class="bdg {{ $inventory->type === 'pinjam' ? 'b-pinjam' : 'b-consumable' }}">
-        <i class="bi {{ $inventory->type === 'pinjam' ? 'bi-arrow-repeat' : 'bi-fire' }}"></i>
-        {{ $inventory->type === 'pinjam' ? 'Pinjam' : 'Consumable' }}
+      <span class="bdg {{ $inventory->type === 'pinjam' ? 'b-pinjam' : ($inventory->type === 'bon' ? 'b-bon' : 'b-consumable') }}">
+        <i class="bi {{ $inventory->type === 'pinjam' ? 'bi-arrow-repeat' : ($inventory->type === 'bon' ? 'bi-tag' : 'bi-fire') }}"></i>
+        {{ $inventory->type === 'pinjam' ? 'Pinjam' : ($inventory->type === 'bon' ? 'BON' : 'Consumable') }}
       </span>
     </div>
     <div class="qr-hint"><i class="bi bi-info-circle me-1"></i>QR berisi kode barang: <strong>{{ $inventory->code }}</strong> — digunakan untuk scan peminjaman</div>
