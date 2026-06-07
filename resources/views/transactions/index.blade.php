@@ -21,6 +21,7 @@
 
       <div class="fgrp">
         <label class="flbl">Peminjam / Pengguna *</label>
+        @if(auth()->user()->isAdmin())
         <div class="sg-wrap w-100">
           <input type="text" id="t-brw-txt" class="fc w-100" placeholder="Ketik nama peminjam..." autocomplete="off" oninput="sgBrwInput(this.value)" onfocus="sgBrwInput(this.value)" onblur="sgBrwBlur()">
           <input type="hidden" id="t-brw">
@@ -31,6 +32,20 @@
           <span id="brw-sel-txt" style="flex:1;font-weight:500;"></span>
           <button class="sg-sel-x" onmousedown="sgBrwClear()"><i class="bi bi-x-lg"></i></button>
         </div>
+        @elseif($borrower)
+        <input type="hidden" id="t-brw" value="{{ $borrower->id }}">
+        <div class="sg-sel" style="display:flex;cursor:default;">
+          <i class="bi bi-person-check-fill" style="color:var(--success);flex-shrink:0;"></i>
+          <span style="flex:1;font-weight:500;">{{ $borrower->name }}{{ $borrower->department ? ' — '.$borrower->department : '' }}</span>
+          <span style="font-size:11px;color:var(--muted);background:var(--bg);padding:2px 7px;border-radius:4px;border:1px solid var(--border);">Terkunci</span>
+        </div>
+        @else
+        <input type="hidden" id="t-brw" value="">
+        <div style="padding:12px;background:#FFF7ED;border:1px solid #FED7AA;border-radius:8px;font-size:13px;color:#C2410C;display:flex;align-items:flex-start;gap:8px;">
+          <i class="bi bi-exclamation-triangle-fill" style="flex-shrink:0;margin-top:1px;"></i>
+          <span>Akun Anda belum dihubungkan dengan data peminjam. Hubungi admin untuk mengatur ini di menu <strong>Manajemen User</strong>.</span>
+        </div>
+        @endif
       </div>
 
       <div class="fgrp">
@@ -148,19 +163,28 @@ let _cart = [], _invT = [], _brwT = [], _selInv = null, _trxStore = [];
 async function initTrx(){
   ld(true);
   try{
+    @if(auth()->user()->isAdmin())
     const requests = [
       api('{{ route("inventory.data") }}'),
       api('{{ route("borrowers.data") }}'),
       api('{{ route("transactions.data") }}'),
+      api('{{ route("transactions.pending") }}'),
     ];
-    @if(auth()->user()->isAdmin())
-    requests.push(api('{{ route("transactions.pending") }}'));
-    @endif
     const results = await Promise.all(requests);
     ld(false);
-    _invT = results[0].data || [];
-    _brwT = results[1].data || [];
+    _invT    = results[0].data || [];
+    _brwT    = results[1].data || [];
     _trxStore = results[2].data || [];
+    @else
+    const requests = [
+      api('{{ route("inventory.data") }}'),
+      api('{{ route("transactions.data") }}'),
+    ];
+    const results = await Promise.all(requests);
+    ld(false);
+    _invT    = results[0].data || [];
+    _trxStore = results[1].data || [];
+    @endif
     const nonPending = _trxStore.filter(t=>t.status!=='menunggu_persetujuan'&&t.status!=='ditolak');
     const total   = nonPending.length;
     const aktif   = nonPending.filter(t=>t.status==='aktif').length;
@@ -379,7 +403,11 @@ async function submitTrx(){
   if(!loanDt){toast('Tanggal pinjam wajib diisi!','warning');return;}
   if(!_cart.length){toast('Keranjang masih kosong!','warning');return;}
   if(!pwValidate('borrow','Foto Peminjam'))return;
+  @if(auth()->user()->isAdmin())
   const brwNm=(_brwT.find(b=>b.id==brwId)||{}).name||'';
+  @else
+  const brwNm={{ $borrower ? Js::from($borrower->name) : "''" }};
+  @endif
   const fd=new FormData();
   fd.append('borrower_id',brwId);
   fd.append('borrower_name',brwNm);
@@ -394,10 +422,12 @@ async function submitTrx(){
     const toastType = res.pending ? 'warning' : 'success';
     toast(res.pending ? `${res.transaction_code} — Menunggu persetujuan admin.` : `Transaksi ${res.transaction_code} berhasil!`, toastType);
     _cart=[];_selInv=null;
+    @if(auth()->user()->isAdmin())
     document.getElementById('t-brw').value='';
     document.getElementById('t-brw-txt').value='';
     document.getElementById('t-brw-txt').placeholder='Ketik nama peminjam...';
     document.getElementById('brw-sel').style.display='none';
+    @endif
     document.getElementById('t-nt').value='';
     _pwClear('borrow');renderCart();
     const trxR=await api('{{ route("transactions.data") }}');

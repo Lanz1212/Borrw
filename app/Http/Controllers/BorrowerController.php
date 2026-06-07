@@ -31,6 +31,14 @@ class BorrowerController extends Controller
     {
         $query = Borrower::query();
 
+        if (!auth()->user()->isAdmin()) {
+            $borrowerId = auth()->user()->borrower_id;
+            if (!$borrowerId) {
+                return response()->json(['success' => true, 'data' => []]);
+            }
+            $query->where('id', $borrowerId);
+        }
+
         // Fitur pencarian berdasarkan nama, departemen, atau kontak
         if ($search = $request->q) {
             $query->where(function ($q) use ($search) {

@@ -25,6 +25,7 @@ class User extends Authenticatable
         'password',
         'role',
         'active',
+        'borrower_id',
     ];
 
     /**
@@ -63,5 +64,14 @@ class User extends Authenticatable
     public function transactions()
     {
         return $this->hasMany(Transaction::class, 'created_by');
+    }
+
+    /**
+     * Relasi Many-to-One ke tabel borrowers.
+     * Menghubungkan akun pengguna dengan data peminjam.
+     */
+    public function borrower()
+    {
+        return $this->belongsTo(Borrower::class);
     }
 }

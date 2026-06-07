@@ -29,9 +29,11 @@
     <div class="col-6 col-sm-auto">
       <input type="date" id="h-date" class="fs" onchange="filterHistory()" title="Filter tanggal pinjam">
     </div>
+    @if(auth()->user()->isAdmin())
     <div class="col-auto">
       <button class="b-xl" onclick="exportHistory()"><i class="bi bi-file-earmark-excel"></i> Export</button>
     </div>
+    @endif
     <div class="col-12 col-sm-auto">
       <a href="{{ route('transactions.index') }}" class="b-acc w-100"><i class="bi bi-plus-lg"></i> Transaksi Baru</a>
     </div>

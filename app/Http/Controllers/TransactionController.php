@@ -22,7 +22,8 @@ class TransactionController extends Controller
      */
     public function index()
     {
-        return view('transactions.index');
+        $borrower = auth()->user()->isAdmin() ? null : auth()->user()->borrower;
+        return view('transactions.index', compact('borrower'));
     }
 
     /**
@@ -43,6 +44,10 @@ class TransactionController extends Controller
     public function data(Request $request): JsonResponse
     {
         $query = Transaction::with(['details.returns'])->orderByDesc('created_at');
+
+        if (!auth()->user()->isAdmin()) {
+            $query->where('created_by', auth()->id());
+        }
 
         if ($status = $request->status) {
             $query->where('status', $status);
@@ -115,6 +120,16 @@ class TransactionController extends Controller
         ]);
 
         $isAdmin = auth()->user()->isAdmin();
+
+        if (!$isAdmin) {
+            $userBorrowerId = auth()->user()->borrower_id;
+            if (!$userBorrowerId) {
+                return response()->json(['success' => false, 'message' => 'Akun Anda belum dihubungkan dengan data peminjam. Hubungi admin.'], 403);
+            }
+            if ((int) $request->borrower_id !== (int) $userBorrowerId) {
+                return response()->json(['success' => false, 'message' => 'Anda hanya dapat membuat transaksi atas nama diri sendiri.'], 403);
+            }
+        }
 
         // Menggunakan Database Transaction untuk mencegah inkonsistensi data jika insert gagal
         return DB::transaction(function () use ($request, $isAdmin) {
@@ -310,6 +325,7 @@ class TransactionController extends Controller
             $q->whereIn('item_type', ['pinjam', 'bon'])->where('status', 'dipinjam');
         }])
         ->whereIn('status', ['aktif', 'partial'])
+        ->when(!auth()->user()->isAdmin(), fn($q) => $q->where('created_by', auth()->id()))
         ->whereHas('details', function ($q) {
             $q->whereIn('item_type', ['pinjam', 'bon'])->where('status', 'dipinjam');
         })

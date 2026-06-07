@@ -21,10 +21,12 @@ Route::get('/login', [AuthController::class, 'showLogin'])->name('login');
 Route::post('/login', [AuthController::class, 'login'])->name('login.post');
 Route::post('/logout', [AuthController::class, 'logout'])->name('logout')->middleware('auth');
 
-// Rute fallback: arahkan ke login jika belum auth, atau dashboard jika sudah auth
+// Rute fallback: arahkan ke login jika belum auth, atau halaman sesuai peran jika sudah auth
 Route::get('/', function () {
     if (!auth()->check()) return redirect()->route('login');
-    return redirect()->route('dashboard');
+    return auth()->user()->isAdmin()
+        ? redirect()->route('dashboard')
+        : redirect()->route('transactions.index');
 });
 
 /**
@@ -49,16 +51,16 @@ Route::middleware('auth')->group(function () {
     Route::get('/returns', [ReturnController::class, 'index'])->name('returns.index');
     Route::post('/returns', [ReturnController::class, 'store'])->name('returns.store');
 
-    // Modul Dashboard (User biasa dan Admin)
-    Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
-    Route::get('/dashboard/stats', [DashboardController::class, 'stats'])->name('dashboard.stats');
-
     /**
      * ==========================================
      * Rute Khusus Administrator
      * ==========================================
      */
     Route::middleware('role:admin')->group(function () {
+
+        // Modul Dashboard (Admin)
+        Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
+        Route::get('/dashboard/stats', [DashboardController::class, 'stats'])->name('dashboard.stats');
 
         // Modul Manajemen Inventaris
         Route::get('/inventory', [InventoryController::class, 'index'])->name('inventory.index');

@@ -10,8 +10,8 @@
 
 <div class="tw">
   <table class="table table-hover">
-    <thead><tr><th>Nama</th><th>Username</th><th>Role</th><th>Status</th><th>Dibuat</th><th>Aksi</th></tr></thead>
-    <tbody id="usr-tb"><tr><td colspan="6" class="text-center py-4" style="color:var(--muted);">Memuat...</td></tr></tbody>
+    <thead><tr><th>Nama</th><th>Username</th><th>Role</th><th>Data Peminjam</th><th>Status</th><th>Dibuat</th><th>Aksi</th></tr></thead>
+    <tbody id="usr-tb"><tr><td colspan="7" class="text-center py-4" style="color:var(--muted);">Memuat...</td></tr></tbody>
   </table>
 </div>
 
@@ -37,6 +37,10 @@
         </div>
         <div class="fgrp"><label class="flbl">Status</label>
           <select id="usr-ac" class="fs w-100"><option value="1">Aktif</option><option value="0">Nonaktif</option></select>
+        </div>
+        <div class="fgrp">
+          <label class="flbl">Data Peminjam <small class="text-muted">(opsional, untuk role User)</small></label>
+          <select id="usr-brw" class="fs w-100"><option value="">— Pilih data peminjam —</option></select>
         </div>
       </div>
       <div class="modal-footer">
@@ -64,18 +68,19 @@ async function loadUsr(){
 function renderUsrRows(users){
   const tb = document.getElementById('usr-tb');
   if(!users.length){
-    tb.innerHTML=`<tr><td colspan="6"><div class="empty"><div class="ei"><i class="bi bi-person-fill"></i></div><p>Belum ada user</p></div></td></tr>`;
+    tb.innerHTML=`<tr><td colspan="7"><div class="empty"><div class="ei"><i class="bi bi-person-fill"></i></div><p>Belum ada user</p></div></td></tr>`;
     return;
   }
   tb.innerHTML = users.map(u=>`<tr>
     <td style="font-weight:500;">${esc(u.name)}</td>
     <td><code style="font-size:12px;">${esc(u.username)}</code></td>
     <td><span class="bdg b-${esc(u.role)}"><i class="${u.role==='admin'?'bi bi-shield-lock':'bi bi-person'}"></i> ${esc(statusLabel(u.role))}</span></td>
+    <td style="font-size:12px;">${u.borrower_name?`<span class="bdg b-aktif"><i class="bi bi-person-check"></i> ${esc(u.borrower_name)}</span>`:'<span style="color:var(--muted);font-size:11px;">—</span>'}</td>
     <td><span class="bdg ${u.active?'b-aktif':'b-rusak'}">${u.active?'Aktif':'Nonaktif'}</span></td>
     <td style="font-size:12px;">${fd(u.created_at)}</td>
     <td style="white-space:nowrap;">
       <button class="btn btn-sm btn-outline-primary me-1" onclick='openUsrMdl(${JSON.stringify(u)})'><i class="bi bi-pencil"></i></button>
-      ${u.id!==CURRENT_USER_ID?`<button class="btn btn-sm btn-outline-danger" onclick="delUsr(${u.id},'${esc(u.name)}')"><i class="bi bi-trash"></i></button>`:'<span style="font-size:11px;color:var(--muted);">(kamu)</span>'}
+      ${u.id!==CURRENT_USER_ID?`<button class="btn btn-sm btn-outline-danger" onclick="delUsr(${u.id},'${esc(u.name)}')" ><i class="bi bi-trash"></i></button>`:'<span style="font-size:11px;color:var(--muted);">(kamu)</span>'}
     </td>
   </tr>`).join('');
 }
@@ -90,6 +95,7 @@ function openUsrMdl(u){
   document.getElementById('usr-pw').value = '';
   document.getElementById('usr-rl').value = u ? u.role : 'user';
   document.getElementById('usr-ac').value = u ? (u.active?'1':'0') : '1';
+  document.getElementById('usr-brw').value = u ? (u.borrower_id||'') : '';
   document.getElementById('usr-ph').textContent = u ? '(kosongkan jika tidak diubah)' : '(wajib untuk user baru)';
   new bootstrap.Modal(document.getElementById('mdl-usr')).show();
 }
@@ -103,6 +109,7 @@ async function saveUsr(){
     password: document.getElementById('usr-pw').value,
     role: document.getElementById('usr-rl').value,
     active: document.getElementById('usr-ac').value === '1',
+    borrower_id: document.getElementById('usr-brw').value || null,
   };
   if(!data.name||!data.username){toast('Nama dan username wajib!','warning');return;}
   if(!data.email){toast('Email wajib diisi!','warning');return;}
@@ -126,6 +133,23 @@ async function delUsr(id, name){
   }catch(e){ld(false);toast(e.message,'danger');}
 }
 
+async function loadBorrowers(){
+  try{
+    const res = await api('{{ route("borrowers.data") }}');
+    const sel = document.getElementById('usr-brw');
+    const prev = sel.value;
+    sel.innerHTML = '<option value="">— Pilih data peminjam —</option>';
+    (res.data||[]).forEach(b=>{
+      const opt = document.createElement('option');
+      opt.value = b.id;
+      opt.textContent = b.name + (b.department ? ' — '+b.department : '');
+      sel.appendChild(opt);
+    });
+    if(prev) sel.value = prev;
+  }catch(e){}
+}
+
 loadUsr();
+loadBorrowers();
 </script>
 @endpush

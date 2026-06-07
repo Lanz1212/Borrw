@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Borrower;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -29,16 +30,18 @@ class UserController extends Controller
      */
     public function data(): JsonResponse
     {
-        $users = User::orderBy('name')
+        $users = User::with('borrower')->orderBy('name')
             ->get()
             ->map(fn($u) => [
-                'id'         => $u->id,
-                'name'       => $u->name,
-                'username'   => $u->username,
-                'email'      => $u->email,
-                'role'       => $u->role,
-                'active'     => $u->active,
-                'created_at' => $u->created_at?->toISOString(),
+                'id'            => $u->id,
+                'name'          => $u->name,
+                'username'      => $u->username,
+                'email'         => $u->email,
+                'role'          => $u->role,
+                'active'        => $u->active,
+                'borrower_id'   => $u->borrower_id,
+                'borrower_name' => $u->borrower?->name,
+                'created_at'    => $u->created_at?->toISOString(),
             ]);
 
         return response()->json(['success' => true, 'data' => $users]);
@@ -53,22 +56,23 @@ class UserController extends Controller
     public function store(Request $request): JsonResponse
     {
         $request->validate([
-            'name'     => 'required|string|max:255',
-            'username' => 'required|string|unique:users,username',
-            'email'    => 'required|email|unique:users,email',
-            'password' => 'required|string|min:6',
-            'role'     => 'required|in:admin,user',
-            'active'   => 'nullable|boolean',
+            'name'        => 'required|string|max:255',
+            'username'    => 'required|string|unique:users,username',
+            'email'       => 'required|email|unique:users,email',
+            'password'    => 'required|string|min:6',
+            'role'        => 'required|in:admin,user',
+            'active'      => 'nullable|boolean',
+            'borrower_id' => 'nullable|exists:borrowers,id',
         ]);
 
         $user = User::create([
-            'name'     => $request->name,
-            'username' => $request->username,
-            'email'    => $request->email,
-            // Hashing password sebelum disimpan ke database
-            'password' => Hash::make($request->password),
-            'role'     => $request->role,
-            'active'   => $request->boolean('active', true),
+            'name'        => $request->name,
+            'username'    => $request->username,
+            'email'       => $request->email,
+            'password'    => Hash::make($request->password),
+            'role'        => $request->role,
+            'active'      => $request->boolean('active', true),
+            'borrower_id' => $request->borrower_id ?: null,
         ]);
 
         return response()->json(['success' => true, 'message' => 'User berhasil ditambahkan.', 'data' => $user->only(['id', 'name', 'username', 'role', 'active'])]);
@@ -85,17 +89,19 @@ class UserController extends Controller
     public function update(Request $request, User $user): JsonResponse
     {
         $request->validate([
-            'name'   => 'required|string|max:255',
-            'email'  => 'required|email|unique:users,email,' . $user->id,
-            'role'   => 'required|in:admin,user',
-            'active' => 'nullable|boolean',
+            'name'        => 'required|string|max:255',
+            'email'       => 'required|email|unique:users,email,' . $user->id,
+            'role'        => 'required|in:admin,user',
+            'active'      => 'nullable|boolean',
+            'borrower_id' => 'nullable|exists:borrowers,id',
         ]);
 
         $updateData = [
-            'name'   => $request->name,
-            'email'  => $request->email,
-            'role'   => $request->role,
-            'active' => $request->boolean('active', true),
+            'name'        => $request->name,
+            'email'       => $request->email,
+            'role'        => $request->role,
+            'active'      => $request->boolean('active', true),
+            'borrower_id' => $request->borrower_id ?: null,
         ];
 
         // Jika password diisi, maka update password (hash terlebih dahulu)

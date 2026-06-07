@@ -283,10 +283,12 @@
       </div>
     </div>
     <div class="sb-nav">
+      @if(auth()->user()->isAdmin())
       <div class="nav-sec">UTAMA</div>
       <a href="{{ route('dashboard') }}" class="nav-btn {{ request()->routeIs('dashboard') ? 'active' : '' }}">
         <i class="bi bi-speedometer2 nav-ico"></i><span class="nav-txt">Dashboard</span>
       </a>
+      @endif
       @if(auth()->user()->isAdmin())
       <div class="nav-sec">INVENTORI</div>
       <a href="{{ route('inventory.index') }}" class="nav-btn {{ request()->routeIs('inventory.*') ? 'active' : '' }}">
