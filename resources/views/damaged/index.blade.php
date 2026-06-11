@@ -116,7 +116,7 @@
 @endsection
 
 @push('scripts')
-<script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js" crossorigin="anonymous"></script>
+<script src="{{ asset('vendor/html5-qrcode/html5-qrcode.min.js') }}"></script>
 <style>
 @keyframes scanAnim{0%{top:6px;}50%{top:calc(100% - 8px);}100%{top:6px;}}
 #dmg-qr-reader video{width:100%!important;display:block;object-fit:cover;}

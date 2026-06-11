@@ -5,10 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
   <meta name="csrf-token" content="{{ csrf_token() }}">
   <title>@yield('title', 'Sparepart MS') — Sparepart Management</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+  @vite(['resources/css/app.css', 'resources/js/app.js'])
   <style>
     :root{--primary:#0F172A;--accent:#F97316;--accent-d:#EA6A0A;--success:#059669;--warning:#D97706;--danger:#DC2626;--info:#2563EB;--purple:#7C3AED;--bg:#F8FAFC;--card:#fff;--muted:#64748B;--border:#E2E8F0;--sw:244px;--sm:58px;--th:56px;--r:8px;--shadow:0 1px 2px rgba(0,0,0,.05);--shadowM:0 4px 16px rgba(0,0,0,.08);--shadowL:0 16px 48px rgba(0,0,0,.12);--nav-active-bg:rgba(249,115,22,.08);--nav-active-txt:#FB923C;--focus-ring:rgba(249,115,22,.08);}
     *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
@@ -366,7 +363,6 @@
 
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 <script>
 const CSRF = document.querySelector('meta[name="csrf-token"]').content;
 const IS_ADMIN = {{ auth()->user()->isAdmin() ? 'true' : 'false' }};
@@ -438,7 +434,6 @@ if(window.innerWidth>=768&&window.innerWidth<=1024){
   document.getElementById('main').classList.add('mini');
 }
 </script>
-<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script>
 function exportXlsx(rows,filename){
   if(typeof XLSX==='undefined'){toast('Library XLSX belum dimuat, coba refresh halaman.','warning');return;}
